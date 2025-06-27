@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Reise anzeigen{% endblock %}
+
+{% block body %}
+<h1>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielort }}</h1>
+<div class="oben-s">
+  <div style="display:flex; gap: 20px; height: 80vh;">
+    <!-- Linke Seite: Karte -->
+    <div style="flex: 3; min-width: 0;">
+      <div id="karte" style="height: 100%; min-height: 800px;"></div>
+    </div>
+
+    <!-- Rechte Seite -->
+    <div style="flex: 1.2; max-width: 360px; display: flex; flex-direction: column; height: 100%;">
+      <div class="reisezeitraum">
+        <p><strong>Anreise:</strong> {{ reise.anreise }}</p>
+        <p><strong>Abreise:</strong> {{ reise.abreise }}</p>
+      </div>
+      <!-- Reiseinfos -->
+      <div id="routen-info" style="font-weight: bold; margin-bottom: 10px;"></div>
+
+      <!-- Infokarten-Bereich -->
+      <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; ">
+      <div style="display: flex; align-items: center; gap: 8px; margin-left: 150px; margin-bottom: 10px; width: 100%; max-width: 300px;">
+        <button id="btnZurueck" onclick="zeigeVorigeKarte()" class="info-nav-btn"><span>←</span></button>
+        <button id="btnWeiter" onclick="zeigeNaechsteKarte()" class="info-nav-btn"><span>→</span></button>
+    </div>
+    <div id="info-karte" style="width: 100%; max-width: 300px; height: 500px; padding: 15px; border-radius: 12px; background: #f8f8f8; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-y: auto; scrollbar-width: thin;">
+    </div>
+    
+  </div>
+
+  <div class="info-Hotel-Flug">
+              {% if reise.fluege and reise.fluege | length >= 1 %}
+              <div>
+                  <h6><strong>✈️ Flugdetails</strong></h6>
+                  <p id="flugInfo">Lade Fluginformationen...</p>
+              </div>
+              {% else %}
+                  <p>✈️ Keine Flugdaten verfügbar.</p>
+              {% endif %}
+
+              {% if reise.hotels and reise.hotels | length > 0 %}
+              <div>
+                  <h6><strong>🏨 Hotels</strong></h6>
+                  <ul>
+                  {% for hotel in reise.hotels %}
+                      <li>
+                      <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
+                      <br>
+                      <small>{{ hotel.address }}</small>
+                      </li>
+                  {% endfor %}
+                  </ul>
+              </div>
+              {% else %}
+              <p>🏨 Keine Hotelinformationen verfügbar.</p>
+              {% endif %}
+              <p id="preisInfo"></p>
+          </div>
+          <div class="linie"></div>
+          <div class="preis">
+              <p>Gesamtpreis</p>
+              <div id="gesamtPreis"></div>
+          </div>
+
+  </div>
+</div>
+
+    <div class="anzeigen-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="/"><span>Zurück</span></a>
+    </div>
+    <a href="{{ url_for('reisen.edit_staedtetrip', reise_id=reise._id) }}" class="button" style="text-decoration: none;"><span>Reise bearbeiten</span></a>
+    </div>
+
+   
+
+
+<script>
+    var zielort = {{ reise.zielort | tojson | safe }};
+    const fluege = {{ reise.fluege | default([]) | tojson | safe }};
+    const hotels = {{ reise.hotels | default([]) | tojson | safe }};
+    console.log("Hotels:", hotels);
+    var sehenswuerdigkeiten = {{ reise.sehenswuerdigkeiten | default([]) | tojson | safe }};
+    if (!Array.isArray(sehenswuerdigkeiten)) {
+        sehenswuerdigkeiten = [];
+    }
+      
+    let karte;
+    let punkte = [];
+    let markerListe = [];
+    let routeLinie = null;
+    let aktuellerModus = "foot";
+
+document.addEventListener("DOMContentLoaded", async () => {
+    karte = L.map("karte").setView([51.1657, 10.4515], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap-Mitwirkende"
+    }).addTo(karte);
+
+    // Zielort geocoden und Karte zentrieren
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) {
+        alert("Zielort nicht gefunden");
+        return;
+    }
+    karte.setView(zielKoord, 13);
+
+    // Stopps geocoden und Marker setzen
+    for (let ort of sehenswuerdigkeiten) {
+        let koord = await geocodeOrt(ort);
+        if (koord) {
+            punkte.push(koord);
+            const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+            markerListe.push(marker);
+        }
+    }
+
+    zeichneRoute();
+
+    zeigeInfosZuOrten();
+
+    // Umschalter Fuß/ÖPNV
+    document.getElementById("modusSelect").addEventListener("change", async (e) => {
+        aktuellerModus = e.target.value;
+        zeichneRoute();
+    });
+});
+
+async function geocodeOrt(ort) {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}&limit=1`);
+    const daten = await res.json();
+    if (daten.length > 0) {
+        return [parseFloat(daten[0].lat), parseFloat(daten[0].lon)];
+    }
+    return null;
+}
+
+async function zeichneRoute() {
+    if (punkte.length < 2) return;
+
+    if (routeLinie) {
+        karte.removeLayer(routeLinie);
+    }
+
+    
+    let profile = (aktuellerModus === "transit") ? "driving-car" : "foot-walking";
+    
+    const body = {
+        coordinates: punkte.map(p => [p[1], p[0]]),
+        format: "geojson"
+    };
+
+    try {
+        const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+            method: "POST",
+            headers: {
+                "Authorization": "5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error("Routing Fehler");
+        const data = await res.json();
+
+        routeLinie = L.geoJSON(data, { style: { color: "blue" } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+        zeigeRouteInfo(data);
+        zeigeHotels();
+
+    } catch (err) {
+        console.error(err);
+        alert("Routing fehlgeschlagen.");
+    }
+}
+console.log("zeigeHotels wird ausgeführt");
+function zeigeHotels() {
+    for (const hotel of hotels) {
+        const koord = [hotel.lat, hotel.lon];
+        L.marker(koord, {
+            icon: L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/139/139899.png',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30]
+            })
+        })
+        .addTo(karte)
+        .bindPopup(`<b>${hotel.name || "Hotel"}</b><br>${hotel.address}`);
+    }
+}
+
+
+
+function zeigeRouteInfo(data) {
+    const summary = data.features?.[0]?.properties?.summary;
+    if (!summary) return;
+
+    const distKm = (summary.distance / 1000).toFixed(1);
+    const dauerMin = Math.round(summary.duration / 60);
+    const std = Math.floor(dauerMin / 60);
+    const min = dauerMin % 60;
+
+    const infoBox = document.getElementById("routen-info");
+    infoBox.textContent = `Distanz: ${distKm} km, Dauer: ${std}h ${min}min`;
+}
+
+async function neuenStoppHinzufuegen() {
+    const feld = document.getElementById("neuerStopp");
+    const ort = feld.value.trim();
+    if (!ort) return;
+
+    const koord = await geocodeOrt(ort);
+    if (!koord) {
+        alert("Ort nicht gefunden");
+        return;
+    }
+
+    punkte.push(koord);
+    sehenswuerdigkeiten.push(ort);
+
+    const marker = L.marker(koord).addTo(karte).bindPopup(ort).openPopup();
+    markerListe.push(marker);
+
+    feld.value = "";
+    zeichneRoute();
+    zeigeInfosZuOrten();
+}
+
+
+let aktuelleKarteIndex = 0;
+let infoKarten = [];
+
+async function zeigeInfosZuOrten() {
+  const bereinigterZielort = zielort.replace(/^\d+\s*/, "");
+  const orte = [bereinigterZielort, ...sehenswuerdigkeiten];
+
+  infoKarten = [];
+
+  const btnGroup = document.createElement('div');
+    btnGroup.style.marginTop = "10px";
+    btnGroup.classList.add('ort-button-container');
+
+  for (const ort of orte) {
+    const wikiInfo = await ladeWikiInfo(ort);
+    const karteDiv = document.createElement('div');
+    karteDiv.classList.add('detail-box');
+
+    if (wikiInfo) {
+      karteDiv.innerHTML = `
+        <h3>${wikiInfo.title}</h3>
+        ${wikiInfo.thumbnail ? `<img src="${wikiInfo.thumbnail}" alt="${wikiInfo.title}" style="max-width:100px; float:left; margin-right:10px;">` : ''}
+        <p>${wikiInfo.extract}</p>
+        <a href="${wikiInfo.pageUrl}" target="_blank">Mehr lesen</a>
+        <div style="clear: both;"></div>
+      `;
+    } else {
+      karteDiv.innerHTML = `<h3>Keine Wikipedia-Info für "${ort}" gefunden.</h3>`;
+    }
+
+    infoKarten.push(karteDiv);
+  }
+
+  const btn = document.createElement('button');
+        btn.textContent = orte;
+        btn.classList.add('ort-button');
+        btn.addEventListener('click', () => {
+            zeigeInfoIndex(i);
+        });
+        btnGroup.appendChild(btn);
+
+
+  aktuelleKarteIndex = 0;
+  zeigeAktuelleKarte();
+
+  
+  
+}
+
+function zeigeAktuelleKarte() {
+  const container = document.getElementById("info-karte");
+  container.innerHTML = '';
+  container.appendChild(infoKarten[aktuelleKarteIndex]);
+
+  document.getElementById("btnZurueck").disabled = aktuelleKarteIndex === 0;
+  document.getElementById("btnWeiter").disabled = aktuelleKarteIndex === infoKarten.length - 1;
+}
+
+function zeigeNaechsteKarte() {
+  if (aktuelleKarteIndex < infoKarten.length - 1) {
+    aktuelleKarteIndex++;
+    zeigeAktuelleKarte();
+  }
+}
+
+function zeigeVorigeKarte() {
+  if (aktuelleKarteIndex > 0) {
+    aktuelleKarteIndex--;
+    zeigeAktuelleKarte();
+  }
+}
+
+
+async function ladeWikiInfo(stichwort) {
+  const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(stichwort)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Wiki nicht gefunden");
+    const daten = await res.json();
+
+    return {
+      title: daten.title || stichwort,
+      extract: daten.extract || "Keine Beschreibung gefunden.",
+      thumbnail: daten.thumbnail?.source || null,
+      pageUrl: daten.content_urls?.desktop?.page || "#"
+    };
+  } catch {
+    return null;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    ladeUndZeigeRoute();
+});
+
+// Flugdaten sortieren (Hin- vor Rückflug)
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+let flugPreis = 0;
+let flugText = "";
+
+if (fluege.length >= 1) {
+  const hinflugSeg = fluege[0].itineraries[0].segments[0];
+  const hinflugPreis = parseFloat(fluege[0].price.grandTotal);
+  flugPreis += hinflugPreis;
+
+  flugText += `
+    🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
+    von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
+    <small>Preis Hinflug: ${hinflugPreis.toFixed(2)} EUR</small><br>
+  `;
+
+  if (fluege.length >= 2) {
+    const rueckflugSeg = fluege[1].itineraries[0].segments[0];
+    const rueckflugPreis = parseFloat(fluege[1].price.grandTotal);
+    flugPreis += rueckflugPreis;
+
+    flugText += `
+      🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
+      von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}<br>
+      <small>Preis Rückflug: ${rueckflugPreis.toFixed(2)} EUR</small><br>
+    `;
+  }
+}
+
+document.getElementById("flugInfo").innerHTML = flugText;
+
+// Hotelpreise berechnen
+let hotelPreis = 0;
+if (hotels && hotels.length > 0) {
+  hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
+}
+
+// Gesamtpreis berechnen
+const gesamt = flugPreis + hotelPreis;
+
+// Formatfunktion für Euro
+const formatPreis = (preis) =>
+  preis.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+  });
+
+// Einzelpreise anzeigen
+if (document.getElementById("preisInfo")) {
+  document.getElementById("preisInfo").innerText = `
+    ✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}
+  `;
+}
+
+// Gesamtpreis anzeigen
+document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Flug + Hotel): ${formatPreis(gesamt)}`;
+
+</script>
+{% endblock %}

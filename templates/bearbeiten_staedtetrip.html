@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Reise bearbeiten {% endblock %}
+
+{% block body %}
+<h2>Reise bearbeiten</h2>
+
+<div class="oben_e">
+   <div style="display: flex; height: 80vh; width: 100vw;">
+    <div class="karte" id="karte" style="flex: 2; min-width: 0;"></div>
+    <div class="info" style="flex: 1; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 10px; border-radius: 12px; min-height: 0; scrollbar-width: thin;">
+      <div class="other-info">
+        <p class="info-z">Reisezeit:</p>
+        <p class="info-e">Entfernung: </p>
+        <p>Reiseziel: {{ reise.zielland }}</p>
+        <p>Reiseart: {{ reise.reiseart | default('Keine Reiseart angegeben') | title}}</p>
+        <form id="reisezeitraum-form">
+        <label for="anreise">Anreise:</label>
+        <input type="date" id="anreise" name="anreise" value="{{ reise.anreise }}" style="width: 16vw;">
+        <br>
+        <label for="abreise">Abreise:</label>
+        <input type="date" id="abreise" name="abreise" value="{{ reise.abreise }}" style="width: 16vw;">
+        </form>
+        {% if reise.hotels and reise.hotels | length > 0 %}
+            <div>
+                <h6><strong>🏨 Hotels</strong></h6>
+                <ul>
+                {% for hotel in reise.hotels %}
+                    <li>
+                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
+                    <br>
+                    <small>{{ hotel.address }}</small>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <p>🏨 Keine Hotelinformationen verfügbar.</p>
+            {% endif %}
+        {% if reise.fluege and reise.fluege | length >= 1 %}
+        <div>
+            <h6><strong>✈️ Flugdetails</strong></h6>
+            <p id="flugInfo">Lade Fluginformationen...</p>
+        </div>
+        {% else %}
+        <p>✈️ Keine Flugdaten verfügbar.</p>
+        {% endif %}
+
+      </div>
+      <div id="sehenswuerdigkeiten-liste-container" style="flex: 0 0 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; margin-top: 10px;">
+            <h3>Sehenswürdigkeiten:</h3>
+            <ul id="sehenswuerdigkeiten-liste" style="list-style-type: none; padding-left: 0; margin: 0;"></ul>
+        </div>
+        <button id="speichere-sehenswuerdigkeiten" type="button" class="button" style="margin-right: 10px; float: right;">
+          <span>Reihenfolge speichern</span>
+        </button>
+    <div class="bearbeiten-links">
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_stopp_staedtetrip', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Sehenswürdigkeit hinzufügen</a>
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_hotel', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Hotel hinzufügen</a>
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_flug', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Flug hinzufügen</a>
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_auto', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Autovermietung hinzufügen</a>
+    </div>
+    </div>
+    </div>
+</div>
+
+<div class="bearbeiten-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.anzeigen_staedtetrip', reise_id=reise._id)}}"><span>Abbrechen</span></a>
+    </div>
+    <button type="submit" class="button"><span>Speichern</span></button>
+</div>
+
+<div id="toast" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #4BB543;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+
+<script>
+    const reiseId = "{{ reise._id or reise.id }}";
+    var zielort = {{ reise.zielort | tojson | safe }};
+    var sehenswuerdigkeiten = {{ reise.sehenswuerdigkeiten | default([]) | tojson | safe }};
+    let fluege = {{ reise.fluege | default([], true) | tojson | safe}}
+    let hotels = {{ reise.hotels | default([], true) | tojson | safe}}
+    if (!Array.isArray(sehenswuerdigkeiten)) {
+        sehenswuerdigkeiten = [];
+    }
+
+    let karte;
+    let punkte = [];
+    let markerListe = [];
+    let routeLinie = null;
+    let aktuellerModus = "foot";
+
+document.addEventListener("DOMContentLoaded", async () => {
+    karte = L.map("karte").setView([51.1657, 10.4515], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap-Mitwirkende"
+    }).addTo(karte);
+
+    // Zielort geocoden und Karte zentrieren
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) {
+        alert("Zielort nicht gefunden");
+        return;
+    }
+    karte.setView(zielKoord, 13);
+
+    // Stopps geocoden und Marker setzen
+    for (let ort of sehenswuerdigkeiten) {
+        let koord = await geocodeOrt(ort);
+        if (koord) {
+            punkte.push(koord);
+            const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+            markerListe.push(marker);
+        }
+    }
+
+    zeichneRoute();
+    aktualisiereStoppListe();
+
+});
+
+  async function geocodeOrt(ort) {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}&limit=1`);
+    const daten = await res.json();
+    if (daten.length > 0) {
+        return [parseFloat(daten[0].lat), parseFloat(daten[0].lon)];
+    }
+    return null;
+}
+
+async function zeichneRoute() {
+    if (punkte.length < 2) return;
+
+    if (routeLinie) {
+        karte.removeLayer(routeLinie);
+    }
+
+    
+    let profile = (aktuellerModus === "transit") ? "driving-car" : "foot-walking";
+    
+    const body = {
+        coordinates: punkte.map(p => [p[1], p[0]]),
+        format: "geojson"
+    };
+
+    try {
+        const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+            method: "POST",
+            headers: {
+                "Authorization": "5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error("Routing Fehler");
+        const data = await res.json();
+
+        routeLinie = L.geoJSON(data, { style: { color: "blue" } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+        zeigeRouteInfo(data);
+        zeigeHotels();
+
+    } catch (err) {
+        console.error(err);
+        alert("Routing fehlgeschlagen.");
+    }
+
+}
+
+console.log("zeigeHotels wird ausgeführt");
+function zeigeHotels() {
+    for (const hotel of hotels) {
+        const koord = [hotel.lat, hotel.lon];
+        L.marker(koord, {
+            icon: L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/139/139899.png',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30]
+            })
+        })
+        .addTo(karte)
+        .bindPopup(`<b>${hotel.name || "Hotel"}</b><br>${hotel.address}`);
+    }
+}
+
+function zeigeRouteInfo(data) {
+    const summary = data.features?.[0]?.properties?.summary;
+    if (!summary) return;
+
+    const distKm = (summary.distance / 1000).toFixed(1);
+    const dauerMin = Math.round(summary.duration / 60);
+    const std = Math.floor(dauerMin / 60);
+    const min = dauerMin % 60;
+
+     const infoZ = document.querySelector(".info-z");
+        const infoE = document.querySelector(".info-e");
+
+        if (infoZ) {
+            infoZ.textContent = `Reisezeit: ${std}h ${min}min`;
+        }
+
+        if (infoE) {
+            infoE.textContent = `Entfernung: ${distKm} km`;
+        }
+}
+
+
+function aktualisiereStoppListe() {
+    const liste = document.getElementById("sehenswuerdigkeiten-liste");
+    liste.innerHTML = "";
+
+    sehenswuerdigkeiten.forEach((ort, index) => {
+        const li = document.createElement("li");
+        li.style.display = "flex";
+        li.style.justifyContent = "space-between";
+        li.style.alignItems = "center";
+        li.style.padding = "5px";
+        li.style.border = "1px solid #ccc";
+        li.style.marginBottom = "5px";
+
+        const span = document.createElement("span");
+        span.textContent = ort;
+        span.style.cursor = "grab";
+
+        const btnEntfernen = document.createElement("button");
+        btnEntfernen.textContent = "✖";
+        btnEntfernen.style.color = "red";
+        btnEntfernen.title = "Sehenswürdigkeit entfernen";
+        btnEntfernen.style.marginLeft = "10px";
+        btnEntfernen.style.border = "none";
+        btnEntfernen.style.background = "none"
+        btnEntfernen.addEventListener("click", () => {
+            sehenswuerdigkeiten.splice(index, 1);
+            punkte.splice(index, 1);
+            karte.removeLayer(markerListe[index]);
+            markerListe.splice(index, 1);
+            aktualisiereStoppListe();
+            zeichneRoute();
+        });
+
+        li.appendChild(span);
+        li.appendChild(btnEntfernen);
+        li.setAttribute("data-index", index);
+
+        liste.appendChild(li);
+    });
+
+    if (liste._sortable) liste._sortable.destroy();
+
+    liste._sortable = Sortable.create(liste, {
+        animation: 150,
+        onEnd: (evt) => {
+            const alt = evt.oldIndex;
+            const neu = evt.newIndex;
+
+            // Arrays synchronisieren
+            const ort = sehenswuerdigkeiten.splice(alt, 1)[0];
+            sehenswuerdigkeiten.splice(neu, 0, ort);
+
+            const punkt = punkte.splice(alt, 1)[0];
+            punkte.splice(neu, 0, punkt);
+
+            const marker = markerListe.splice(alt, 1)[0];
+            markerListe.splice(neu, 0, marker);
+
+            zeichneRoute();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    zeichneRoute();
+});
+
+async function speichereStoppreihenfolge() {
+    try {
+        const response = await fetch(`/reise/${reiseId}/sehenswuerdigkeiten`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ sehenswuerdigkeiten: sehenswuerdigkeiten })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Fehler beim Speichern: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log("Reihenfolge gespeichert:", result.message);
+    } catch (error) {
+        console.error("Fehler beim Speichern der Sehenswürdigkeiten:", error);
+    }
+}
+document.getElementById('speichere-sehenswuerdigkeiten').addEventListener('click', async () => {
+    try {
+        // Speichere nur die Stoppreihenfolge
+        const response = await fetch(`/reise/${reiseId}/sehenswuerdigkeiten`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sehenswuerdigkeiten: sehenswuerdigkeiten })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Fehler beim Speichern: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        zeigeToast("Sehenswürdigkeiten erfolgreich gespeichert!");
+        console.log("Sehenswürdigkeiten gespeichert:", result.message);
+    } catch (error) {
+        zeigeToastError("Fehler beim Speichern der Sehenswürdigkeiten.");
+        console.error("Fehler beim Speichern der Sehenswürdigkeiten:", error);
+    }
+});
+
+function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventListener('click', async (e) => {
+    e.preventDefault();
+
+    const anreise = document.getElementById('anreise').value;
+    const abreise = document.getElementById('abreise').value;
+
+    try {
+        const response = await fetch(`/reise/${reiseId}/bearbeiten`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sehenswuerdigkeiten: sehenswuerdigkeiten,
+                anreise: anreise,
+                abreise: abreise
+            })
+        });
+
+        if (!response.ok) throw new Error("Fehler beim Speichern");
+
+        const result = await response.json();
+        zeigeToast("Reise erfolgreich gespeichert!");
+        setTimeout(() => {
+  window.location.href = `/anzeigen_staedtetrip/${reiseId}`;
+}, 1500);
+    } catch (err) {
+        console.error(err);
+        zeigeToastError("Fehler beim Speichern der Reise.");
+    }
+});
+
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
+
+const hinflugSeg = fluege[0].itineraries[0].segments[0];
+
+// Prüfen, ob ein Rückflug existiert
+const rueckflugSeg = fluege.length > 1 ? fluege[1].itineraries[0].segments[0] : null;
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+let flugText = `
+  🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
+  von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
+`;
+
+if (rueckflugSeg) {
+  flugText += `
+    🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
+    von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}
+  `;
+}
+
+document.getElementById("flugInfo").innerHTML = flugText;
+
+
+</script>
+{% endblock %}

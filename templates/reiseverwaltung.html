@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+
+{% block title %}Reiseplanung{% endblock %}
+
+{% block body %}
+<h1>Deine Reise nach {{ zielland }}</h1>
+<h2>Reiseoptionen</h2>
+
+<form action="{{ url_for('reisen.ergebnisse') }}" method="POST" class="reiseformular">
+  <input type="hidden" id="zielland" name="zielland" value="{{ zielland }}">
+
+  <div class="formular-abschnitt">
+    <h2>Reiseart auswählen</h2>
+    <div class="optionengruppe">
+      {% for art in ["Badeurlaub", "Städtetrip", "Roadtrip"] %}
+      <label>
+        <input type="radio" name="reiseart" value="{{ art }}" required>
+        <span>{{ art }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div id="roadtrip-options" style="display: none;">
+  <div class="formular-abschnitt">
+    <h2>Zwischenstopps</h2>
+    <label>
+      <input type="radio" name="stopps_option" value="vorschlagen">
+      Zwischenstopps vorschlagen
+    </label><br>
+    <label>
+      <input type="radio" name="stopps_option" value="manuell">
+      Stopps manuell hinzufügen
+    </label>
+
+    <div id="manuelle-stopps" class="versteckt">
+      <label for="zwischenstopp-input">Zwischenstopp (PLZ oder Ort):</label>
+      <div class="autocomplete-wrapper" style="position: relative; display: inline-block;">
+        <input type="text" id="zwischenstopp-input" placeholder="z.B. Leipzig" autocomplete="off">
+        <ul id="autocomplete-stopps-list" class="autocomplete-list"></ul>
+      </div>
+      <div id="zwischenstopps-liste"></div>
+      <input type="hidden" name="zwischenstopps" id="zwischenstopps-hidden">
+    </div>
+  </div>
+  </div>
+  
+  <div id="badeurlaub-options" style="display: none;">
+    <div class="formular-abschnitt">
+        <h2>Hotel</h2>
+        <div id="hotel-form">
+          <input type="text" id="hotelname" name="hotelname" placeholder="Name (z.B. Hotel Caravel)" style="margin-bottom: 8px;">
+        </div>
+        <h2>Flug</h2>
+        <div id="flug-form" style="display: flex;">
+          <input type="text" id="von" name="von" placeholder="Start (z.B. FRA)" style="margin-right: 5px;" >
+          <input type="text" id="nach" name="nach" placeholder="Ziel (z.B. JFK)" style="margin-right: 5px;" >
+          <input type="date" id="anreise">
+        </div>
+
+<div id="fluege-container"></div>
+    </div>
+  </div>
+
+  <div id="staedtetrip-options" style="display:none;">
+  <h2>Sehenswürdigkeiten</h2>
+  <label for="sehenswuerdigkeit-input">Name der Sehenswürdigkeit:</label>
+  <div>
+    <input type="text" id="sehenswuerdigkeit-input" placeholder="z.B. Brandenburger Tor">
+  <div id="sehenswuerdigkeit-liste" style="margin-top:10px;"></div>
+    <input type="hidden" name="sehenswuerdigkeiten" id="sehenswuerdigkeiten-hidden">
+  </div>
+</div>
+
+
+  <h2>Reisezeitraum</h2>
+  <div class="formular-abschnitt zeitraum-row">
+    <div>
+    <label>
+      Anreise:
+      <input type="date" name="anreise" required>
+    </label>
+    </div>
+    <div>
+    <label>
+      Abreise:
+      <input type="date" name="abreise" required>
+    </label>
+  </div>
+  </div>
+   
+    <div class="formular-buttons">
+        <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="/"><span>Abbrechen</span></a>
+        </div>
+
+        <div class="zielort-eingabe">
+            <label for="zielort">Zielort eingeben (PLZ oder Ort):</label>
+            <div class="autocomplete-wrapper" style="position: relative;">
+                <input type="text" id="zielort" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required>
+                <ul id="autocomplete-list" class="autocomplete-list"></ul>
+            </div>
+        </div>
+
+        <button class="button_l" type="submit">
+            <span>🔍</span>
+        </button>
+    </div>
+</form>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const zielland = "{{ zielland }}";
+
+  // ========== ZIELORT AUTOCOMPLETE ==========
+  setupAutocomplete('zielort', 'autocomplete-list', '/autocomplete_ort', zielland);
+
+  // ========== ZWISCHENSTOPPS ==========
+  const eingabe = document.getElementById('zwischenstopp-input');
+  const stoppsList = document.getElementById('autocomplete-stopps-list');
+  const stoppTags = document.getElementById('zwischenstopps-liste');
+  const hiddenField = document.getElementById('zwischenstopps-hidden');
+  window.zwischenstopps = [];
+
+  if (hiddenField.value.trim()) {
+    hiddenField.value.split(',').forEach(stop => {
+      const trimmed = stop.trim();
+      if (trimmed) zwischenstopps.push(trimmed);
+    });
+    updateTagUI();
+  }
+
+  function addZwischenstopp(name) {
+    const normalized = name.toLowerCase();
+    if (zwischenstopps.some(s => s.toLowerCase() === normalized)) return;
+    zwischenstopps.push(name);
+    updateTagUI();
+    eingabe.value = '';
+    stoppsList.style.display = 'none';
+    hiddenField.value = zwischenstopps.join(',');
+  }
+
+  function removeZwischenstopp(name) {
+    const index = zwischenstopps.findIndex(s => s === name);
+    if (index !== -1) {
+      zwischenstopps.splice(index, 1);
+      updateTagUI();
+      hiddenField.value = zwischenstopps.join(',');
+    }
+  }
+
+  function updateTagUI() {
+    stoppTags.innerHTML = '';
+    zwischenstopps.forEach(name => {
+      const tag = document.createElement('div');
+      tag.textContent = name;
+      tag.className = 'tag';
+      tag.style.cssText = 'display:inline-block; margin:5px; padding:5px 10px; background:#ccc; border-radius:15px';
+
+      const remove = document.createElement('button');
+      remove.textContent = '✖';
+      remove.style.cssText = 'margin-left:8px; background:none; border:none; cursor:pointer';
+      remove.addEventListener('click', () => removeZwischenstopp(name));
+
+      tag.appendChild(remove);
+      stoppTags.appendChild(tag);
+    });
+  }
+
+  eingabe.addEventListener('input', async () => {
+    const query = eingabe.value.trim();
+    if (query.length < 2 || !zielland) {
+      stoppsList.style.display = 'none';
+      return;
+    }
+
+    try {
+      const response = await fetch(`/autocomplete_ort?q=${encodeURIComponent(query)}&country=${encodeURIComponent(zielland)}`);
+      const data = await response.json();
+      stoppsList.innerHTML = '';
+
+      if (!data.results || data.results.length === 0) {
+        stoppsList.style.display = 'none';
+        return;
+      }
+
+      data.results.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        li.style.cssText = 'cursor:pointer; padding:5px';
+        li.addEventListener('click', () => addZwischenstopp(item));
+        stoppsList.appendChild(li);
+      });
+
+      stoppsList.style.cssText = 'position:absolute; width:100%; top:100%; left:0; z-index:1000; display:block';
+
+    } catch (err) {
+      console.error("Fehler bei Zwischenstopp-Autocomplete:", err);
+      stoppsList.style.display = 'none';
+    }
+  });
+
+  eingabe.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = eingabe.value.trim();
+      if (val) addZwischenstopp(val);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!stoppsList.contains(e.target) && e.target !== eingabe) {
+      stoppsList.style.display = 'none';
+    }
+  });
+
+  function setupAutocomplete(inputId, listId, endpoint, land) {
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+
+    input.addEventListener('input', async () => {
+      const query = input.value.trim();
+      if (query.length < 2 || !land) {
+        list.style.display = 'none';
+        return;
+      }
+
+      try {
+        const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&country=${encodeURIComponent(land)}`);
+        const data = await response.json();
+        list.innerHTML = '';
+
+        if (!data.results || data.results.length === 0) {
+          list.style.display = 'none';
+          return;
+        }
+
+        data.results.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          li.style.cssText = 'padding:5px; cursor:pointer';
+          li.addEventListener('click', () => {
+            input.value = item;
+            list.style.display = 'none';
+          });
+          list.appendChild(li);
+        });
+
+        list.style.cssText = 'width:100%; top:100%; left:0; position:absolute; z-index:1000; display:block';
+
+      } catch (err) {
+        console.error('Autocomplete Fehler:', err);
+        list.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!list.contains(e.target) && e.target !== input) {
+        list.style.display = 'none';
+      }
+    });
+  }
+
+  // ========== Zwischenstopps manuell anzeigen ==========
+  document.querySelectorAll('input[name="stopps_option"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+      document.getElementById('manuelle-stopps').style.display = this.value === 'manuell' ? 'block' : 'none';
+    });
+  });
+
+  const reiseartRadios = document.querySelectorAll('input[name="reiseart"]');
+
+  const reiseartSections = {
+    Roadtrip: document.getElementById('roadtrip-options'),
+    Badeurlaub: document.getElementById('badeurlaub-options'),
+    Städtetrip: document.getElementById('staedtetrip-options'),
+  };
+
+  reiseartRadios.forEach(radio => {
+    radio.addEventListener('change', function () {
+      const selected = this.value;
+
+      Object.values(reiseartSections).forEach(section => {
+        if (section) section.style.display = 'none';
+      });
+
+      if (reiseartSections[selected]) {
+        reiseartSections[selected].style.display = 'block';
+      }
+
+      console.log(`Reiseart ausgewählt: ${selected}`);
+    });
+  });
+
+});
+
+function updateStoppsRequired() {
+  const visible = document.getElementById('roadtrip-options').style.display !== 'none';
+  const radios = document.querySelectorAll('input[name="stopps_option"]');
+  radios.forEach(radio => {
+    if (visible) {
+      radio.setAttribute('required', 'required');
+    } else {
+      radio.removeAttribute('required');
+    }
+  });
+}
+
+// Diese Funktion nach jeder Auswahl von "Reiseart" aufrufen
+document.querySelectorAll('input[name="reiseart"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const value = radio.value;
+    document.getElementById('roadtrip-options').style.display = value === 'Roadtrip' ? 'block' : 'none';
+    document.getElementById('badeurlaub-options').style.display = value === 'Badeurlaub' ? 'block' : 'none';
+    document.getElementById('staedtetrip-options').style.display = value === 'Städtetrip' ? 'block' : 'none';
+    updateStoppsRequired(); // <== hier aufrufen
+  });
+});
+
+//Städtetrip
+const input = document.getElementById("sehenswuerdigkeit-input");
+const liste = document.getElementById("sehenswuerdigkeit-liste");  // Container für die Tags
+const hiddenInput = document.getElementById("sehenswuerdigkeiten-hidden");
+
+let sehenswuerdigkeiten = [];
+
+input.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && input.value.trim() !== "") {
+    e.preventDefault();
+    const eintrag = input.value.trim();
+    if (!sehenswuerdigkeiten.includes(eintrag)) {
+      sehenswuerdigkeiten.push(eintrag);
+      aktualisiereSehenswuerdigkeitenTags();
+      input.value = "";
+    }
+  }
+});
+
+function removeSehenswuerdigkeit(name) {
+  sehenswuerdigkeiten = sehenswuerdigkeiten.filter(item => item !== name);
+  aktualisiereSehenswuerdigkeitenTags();
+}
+
+function aktualisiereSehenswuerdigkeitenTags() {
+  liste.innerHTML = '';
+  sehenswuerdigkeiten.forEach(name => {
+    const tag = document.createElement('div');
+    tag.textContent = name;
+    tag.className = 'tag';
+    tag.style.cssText = 'display:inline-block; margin:5px; padding:5px 10px; background:#ccc; border-radius:15px';
+
+    const remove = document.createElement('button');
+    remove.textContent = '✖';
+    remove.style.cssText = 'margin-left:8px; background:none; border:none; cursor:pointer';
+    remove.addEventListener('click', () => removeSehenswuerdigkeit(name));
+
+    tag.appendChild(remove);
+    liste.appendChild(tag);
+  });
+
+  // Setze hidden Input mit JSON-Array
+  hiddenInput.value = JSON.stringify(sehenswuerdigkeiten);
+}
+
+const form = document.querySelector('form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = new FormData(form);
+  const reiseart = formData.get('reiseart');
+
+  // Optional Felder abhängig von der Reiseart
+  if (reiseart === 'Roadtrip') {
+    const stoppsOption = formData.get('stopps_option');
+    if (stoppsOption === 'manuell') {
+      formData.set('zwischenstopps', zwischenstopps.join(','));
+    }
+  }
+
+  if (reiseart === 'Städtetrip') {
+    formData.set('sehenswuerdigkeiten', JSON.stringify(sehenswuerdigkeiten));
+  }
+
+  // Füge ggf. Flug- oder Hoteldaten hinzu (z.B. bei Badeurlaub)
+
+  const res = await fetch(form.action, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (res.ok) {
+    window.location.href = res.url; // oder zeige Erfolgsmeldung
+  } else {
+    zeigeToastError("Fehler beim Absenden");
+  }
+});
+
+function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+</script>
+
+{% endblock %}

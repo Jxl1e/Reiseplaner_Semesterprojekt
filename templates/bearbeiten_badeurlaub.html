@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Reise anzeigen{% endblock %}
+
+{% block body %}
+    <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland }}</h2>
+
+    <div class="oben-b">
+    <h4><strong>Reisedaten</strong></h4>
+    <form id="reisezeitraum-form">
+        <label for="anreise"><strong>Anreise:</strong></label>
+        <input type="date" id="anreise" name="anreise" value="{{ reise.anreise }}" style="width: 16vw; margin-bottom: 8px;">
+        <br>
+        <label for="abreise"><strong>Abreise:</strong></label>
+        <input type="date" id="abreise" name="abreise" value="{{ reise.abreise }}" style="width: 16vw;">
+        </form>
+
+    <p><strong>Zielland</strong>: {{ reise.zielland }}</p>
+
+     <div class="bearbeiten-links" style="height: 5vh;">
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_hotel', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Hotel hinzufügen</a>
+    <a class="link-b" href="{{ url_for('reisen.hinzufuegen_flug', reise_id=reise._id) }}"><i class="fas fa-plus-circle" style="margin-top: -10px;"></i> Flug hinzufügen</a>
+    </div>
+
+    <div class="info-Hotel-Flug">
+            {% if reise.fluege and reise.fluege | length >= 1 %}
+            <div>
+                <h6><strong>✈️ Flugdetails</strong></h6>
+                <p id="flugInfo">Lade Fluginformationen...</p>
+            </div>
+            {% else %}
+                <p>✈️ Keine Flugdaten verfügbar.</p>
+            {% endif %}
+
+            {% if reise.hotels and reise.hotels | length > 0 %}
+            <div>
+                <h6><strong>🏨 Hotels</strong></h6>
+                <ul>
+                {% for hotel in reise.hotels %}
+                    <li>
+                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
+                    <br>
+                    <small>{{ hotel.address }}</small>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <p>🏨 Keine Hotelinformationen verfügbar.</p>
+            {% endif %}
+        </div>
+   
+     </div>
+
+    <div class="bearbeiten-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.anzeigen_badeurlaub', reise_id=reise._id)}}"><span>Abbrechen</span></a>
+    </div>
+    <button type="submit" class="button"><span>Speichern</span></button>
+</div>
+
+<div id="toast" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #4BB543;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<script>
+    const reiseId = "{{ reise._id or reise.id }}";
+    const fluege = {{ reise.fluege | default([]) | tojson | safe }};
+    const hotels = {{ reise.hotels | default([]) | tojson | safe }};
+
+    
+function entferneFlug(index) {
+  fluege.splice(index, 1);
+  zeigeFluege(); // neu rendern
+}
+
+            
+// Flugdaten sortieren (Hin- vor Rückflug)
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+let flugPreis = 0;
+let flugText = "";
+
+
+
+function zeigeFluege() {
+    let flugText = "";
+    let flugPreis = 0;
+
+    fluege.forEach((flug, index) => {
+        const seg = flug.itineraries[0].segments[0];
+        const preis = parseFloat(flug.price.grandTotal);
+        flugPreis += preis;
+
+        flugText += `
+            ✈️ <strong>${index === 0 ? "Hinflug" : "Rückflug"}:</strong> ${formatDate(seg.departure.at)}
+            von ${seg.departure.iataCode} nach ${seg.arrival.iataCode}<br>
+            <small>Preis: ${preis.toFixed(2)} EUR</small><br>
+            <button class="entfernen-button" onclick="entferneFlug(${index})">🗑️ Entfernen</button>
+            <hr>
+        `;
+    });
+
+    document.getElementById("flugInfo").innerHTML = flugText;
+}
+
+
+
+document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventListener('click', async (e) => {
+    e.preventDefault();
+
+    const anreise = document.getElementById('anreise').value;
+    const abreise = document.getElementById('abreise').value;
+
+    try {
+        const response = await fetch(`/reise/${reiseId}/bearbeiten`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fluege: fluege,
+                anreise: anreise,
+                abreise: abreise
+            })
+        });
+
+        if (!response.ok) throw new Error("Fehler beim Speichern");
+
+        const result = await response.json();
+        zeigeToast("Reise erfolgreich gespeichert!");
+        setTimeout(() => {
+  window.location.href = `/anzeigen_badeurlaub/${reiseId}`;
+}, 1500);
+    } catch (err) {
+        console.error(err);
+        zeigeToastError("Fehler beim Speichern der Reise.");
+    }
+});
+
+function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+zeigeFluege();
+
+function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+</script>
+{% endblock %}

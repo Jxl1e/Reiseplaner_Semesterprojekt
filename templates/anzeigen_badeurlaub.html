@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Reise anzeigen{% endblock %}
+
+{% block body %}
+    <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland }}</h2>
+
+    <h4>Reisedaten</h4>
+    <p><strong>Anreise:</strong> {{ reise.anreise }} <br>
+    <strong>Abreise:</strong> {{ reise.abreise }}</p>
+
+    <p>Zielland: {{ reise.zielland }}</p>
+
+    <div class="info-Hotel-Flug">
+            {% if reise.fluege and reise.fluege | length >= 1 %}
+            <div>
+                <h6><strong>✈️ Flugdetails</strong></h6>
+                <p id="flugInfo">Lade Fluginformationen...</p>
+            </div>
+            {% else %}
+                <p>✈️ Keine Flugdaten verfügbar.</p>
+            {% endif %}
+
+            {% if reise.hotels and reise.hotels | length > 0 %}
+            <div>
+                <h6><strong>🏨 Hotels</strong></h6>
+                <ul>
+                {% for hotel in reise.hotels %}
+                    <li>
+                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
+                    <br>
+                    <small>{{ hotel.address }}</small>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <p>🏨 Keine Hotelinformationen verfügbar.</p>
+            {% endif %}
+            <p id="preisInfo"></p>
+        </div>
+        <div class="linie"></div>
+        <div class="preis">
+            <p>Gesamtpreis</p>
+            <div id="gesamtPreis"></div>
+        </div>
+
+        <div class="anzeigen-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="/"><span>Zurück</span></a>
+    </div>
+    <a href="{{ url_for('reisen.edit_badeurlaub', reise_id=reise._id) }}" class="button" style="text-decoration: none;"><span>Reise bearbeiten</span></a>
+    </div>
+
+<script>
+    const fluege = {{ reise.fluege | default([]) | tojson | safe }};
+    const hotels = {{ reise.hotels | default([]) | tojson | safe }};
+            
+// Flugdaten sortieren (Hin- vor Rückflug)
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+let flugPreis = 0;
+let flugText = "";
+
+if (fluege.length >= 1) {
+  const hinflugSeg = fluege[0].itineraries[0].segments[0];
+  const hinflugPreis = parseFloat(fluege[0].price.grandTotal);
+  flugPreis += hinflugPreis;
+
+  flugText += `
+    🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
+    von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
+    <small>Preis Hinflug: ${hinflugPreis.toFixed(2)} EUR</small><br>
+  `;
+
+  if (fluege.length >= 2) {
+    const rueckflugSeg = fluege[1].itineraries[0].segments[0];
+    const rueckflugPreis = parseFloat(fluege[1].price.grandTotal);
+    flugPreis += rueckflugPreis;
+
+    flugText += `
+      🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
+      von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}<br>
+      <small>Preis Rückflug: ${rueckflugPreis.toFixed(2)} EUR</small><br>
+    `;
+  }
+}
+
+document.getElementById("flugInfo").innerHTML = flugText;
+
+// Hotelpreise berechnen
+let hotelPreis = 0;
+if (hotels && hotels.length > 0) {
+  hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
+}
+
+// Gesamtpreis berechnen
+const gesamt = flugPreis + hotelPreis;
+
+// Formatfunktion für Euro
+const formatPreis = (preis) =>
+  preis.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+  });
+
+// Einzelpreise anzeigen
+if (document.getElementById("preisInfo")) {
+  document.getElementById("preisInfo").innerText = `
+    ✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}
+  `;
+}
+
+// Gesamtpreis anzeigen
+document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Flug + Hotel): ${formatPreis(gesamt)}`;
+        </script>
+{% endblock %}

@@ -1,0 +1,982 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+
+
+.alert {
+  margin-bottom: 0.5rem;
+}
+
+body.main::before,
+body.auth::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('/static/images/Dom_Rep_Strand.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: -2;
+}
+
+body.main::after {
+  content: "";
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.05); 
+  backdrop-filter: blur(5px);
+  z-index: -1;
+}
+
+body.auth::after {
+  display: none;
+}
+
+body.main .container.full-viewport {
+  min-height: 96vh;
+  background-color: rgba(255, 255, 255, 0.85);
+  padding: 2rem;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 0;
+}
+
+.flash_wrapper {
+  margin: 1rem auto;
+  max-width: 800px;
+  padding: 0 1rem;
+}
+
+.hauptbereich {
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+}
+
+.oben_e { 
+  display: flex;
+}
+
+.links_e {
+  width: 200px; 
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.unten_a {
+  margin-top: 0.5vh;
+  display: flex;
+}
+
+
+.karte {
+  flex: 1;
+  height: 100%; 
+  min-width: 0;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #333;
+  padding: 0 10px;
+  list-style: none;
+  margin: 0;
+}
+
+.nav-left,
+.nav-right {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-item {
+  color: white;
+  text-decoration: none;
+  padding: 14px 16px;
+  display: block;
+}
+
+.nav-item-nk {
+  color: white;
+  text-decoration: none;
+  padding: 14px 16px;
+  display: block;
+}
+
+.nav-item:hover {
+  background-color: #111;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="email"],
+input[type="password"] {
+  font-size: 1rem;
+  padding: 0.6rem;
+  border-radius: 0.5rem;
+  height: 5vh;
+  width: 16.5vw;
+  border: 1px solid #ccc;
+}
+
+.button_abr {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #878787;
+  border-radius: 12px;
+  background-color: #878787;
+  width: 5vw;
+  height: 5vh;
+  margin: 5px;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button_abr:hover {
+  background-color: #757474;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #4f46e5;
+  border-radius: 6px;
+  background-color: transparent;
+  width: 5vw;
+  height: 5vh;
+  margin: 5px;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button::before, .button_p::before, .button_l::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 0%;
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+  z-index: 0;
+  transition: all 0.4s ease;
+  border-radius: 6px;
+}
+
+.button:hover::before, .button_p:hover::before, .button_l:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.button span, .button_p span, .button_l span {
+  position: relative;
+  z-index: 2;
+}
+
+.button:hover, .button_p:hover, .button_l:hover {
+  color: white;
+}
+
+.button:active, .button_p:active, .button_l:active {
+  transform: scale(0.98);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.button_p {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #4f46e5;
+  border-radius: 20px;
+  background-color: transparent;
+  width: 20vw;
+  height: 5vh;
+  margin: 5px;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button_l {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #4f46e5;
+  border-radius: 12px;
+  background-color: transparent;
+  width: 5vw;
+  height: 5vh;
+  margin: 5px;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button_l span {
+  font-size: 1.5rem; 
+}
+
+.button_r {
+  border-radius: 6px;
+  height: 4vh;
+  width: 10vw;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #4f46e5;
+  border-radius: 6px;
+  background-color: transparent;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 1vw;
+}
+
+.button_r::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 0%;
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+  z-index: 0;
+  transition: all 0.4s ease;
+  border-radius: 6px;
+}
+
+.button_r:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.button_r span {
+  position: relative;
+  z-index: 2;
+}
+
+.button_r:hover {
+  color: white;
+}
+
+.button_r:active {
+  transform: scale(0.98);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.button_r_abr {
+  border-radius: 6px;
+  height: 4vh;
+  width: 10vw;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #878787;
+  border-radius: 6px;
+  background-color: #878787;
+   color: white;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 1vw;
+  margin-right: 40vh;
+}
+
+.button_r_abr:hover {
+  background-color: #757474;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ort-button-container {
+  display: flex;
+  flex-wrap: wrap; 
+  gap: 10px; 
+  margin-top: 1rem;
+}
+
+.ort-button {
+  border-radius: 6px;
+  height: 3vh;
+  width: 4vw;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #bcbcbc;
+  border-radius: 6px;
+  background-color: #bcbcbc;
+   color: black;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ort-button:hover {
+  background-color: #9f9f9f;
+  color: black;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.nav-button, .info-nav-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid #4f46e5;
+  background-color: transparent;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  padding: 0.5em 1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin: 0 0.5em;
+}
+
+.nav-button::before, .info-nav-btn::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 0%;
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+  z-index: 0;
+  transition: all 0.4s ease;
+  border-radius: 6px;
+}
+
+.nav-button:not(:disabled):hover::before, .info-nav-btn:not(:disabled):hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.nav-button span, .info-nav-btn span {
+  position: relative;
+  z-index: 2;
+}
+
+.nav-button:not(:disabled):hover, .info-nav-btn:not(:disabled):hover {
+  color: white;
+}
+
+.nav-button:disabled, .info-nav-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+
+.anlegen {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid black;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  width: 95%;
+  padding: 10px;
+  transition: 0.2s ease-in-out;
+  background-color: #e9e9e9;
+}
+
+.card:hover {
+  transform: scale(1.01);
+}
+
+.cont {
+  padding-top: 5px;
+  padding-left: 15px;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 68.9vh;
+  min-height: 68.9vh;
+  z-index: 1;
+}
+
+.oben {
+  display: flex;
+  justify-content: space-between;
+}
+
+.unten {
+  display: flex;
+  justify-content: space-between;
+}
+
+.z_ort {
+  padding-top: 25px;
+}
+
+.unten_e {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.autocomplete-list {
+  position: fixed;
+    border: 1px solid #ccc;
+    max-height: 200px;
+    overflow-y: auto;
+    position: absolute;
+    background: white;
+    z-index: 1000;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.autocomplete-list li {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.autocomplete-list li:hover {
+    background: #f0f0f0;
+}
+
+.autocomplete-list li .plz {
+    flex: 0 0 70px;
+    font-weight: bold;
+}
+
+.autocomplete-list li .ort {
+    flex: 1;
+}
+
+.autocomplete-list {
+    border: 1px solid #ccc;
+    max-height: 200px;
+    overflow-y: auto;
+    position: absolute;
+    background: white;
+    z-index: 1000;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.autocomplete-list li {
+    padding: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.autocomplete-list li:hover {
+    background: #f0f0f0;
+}
+
+#zwischenstopps-liste {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    gap: 5px;
+}
+
+.tag {
+    background-color: #e0e0e0;
+    padding: 6px 10px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
+
+.remove-btn {
+    background: none;
+    border: none;
+    margin-left: 8px;
+    cursor: pointer;
+    color: #888;
+    font-size: 14px;
+}
+.remove-btn:hover {
+    color: red;
+}
+
+.login-wrapper {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.card_a {
+  background: linear-gradient(to bottom, #ffffff, #f9f9f9);
+  border-radius: 12px;
+  width: 20vw;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+ul {
+  margin-top: 0.5em;
+  margin-bottom: 1em;
+  line-height: 1.4;
+}
+
+li {
+  display: list-item;
+  margin-bottom: 0.2em;
+}
+
+#karte {
+  width: 100%;
+  height: 100%;
+}
+
+.detail-box {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+}
+
+.unten_d {
+  display: flex;
+  justify-content: center;
+}
+
+.space {
+  height: 2vh;
+}
+
+.reiseformular {
+  max-width: 800px;
+  margin: auto;
+  padding: 2rem;
+  font-family: Arial, sans-serif;
+}
+
+.formular-abschnitt {
+  margin-bottom: 2rem;
+}
+
+.optionengruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  background: #f5f5f5;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 0 3px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width: 2vw;
+  height: 3vh;
+  accent-color: #007BFF;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.zeitraum-row {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: nowrap;
+}
+.zeitraum-row label {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.zeitraum-row input {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #ccc;
+}
+
+.formular-buttons {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: nowrap; 
+}
+
+.zielort-eingabe {
+  flex: 1 1 60%;
+  display: flex;
+  flex-direction: column;
+}
+
+.zielort-eingabe input {
+  padding: 0.6rem;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #ccc;
+  width: 100%;
+}
+
+.versteckt {
+  display: none;
+}
+
+.unten_d {
+  margin: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.land-auswahl-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.land-auswahl-form label {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.land-auswahl-form select {
+  padding: 8px 12px;
+  font-size: 1rem;
+  border: 2px solid #007BFF;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  appearance: none; 
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px 16px;
+  cursor: pointer;
+}
+
+.linie {
+  border-top: 1px solid black;
+  margin-top: 5px;
+  margin-bottom: 20px;
+}
+
+.bearbeiten-buttons, .anzeigen-buttons, .stopps-buttons {
+  display: flex;
+  float: right
+}
+
+.bearbeiten-links {
+  display: inline-grid;
+  width: 20vw;
+  height: 10vh;
+  margin-left: 10px;
+  margin-top: 8px;
+}
+
+.link-b {
+  text-decoration: none;
+  color: black;
+  transition: 0.3s ease;
+}
+
+.link-b:hover{
+  color: rgb(102, 230, 255);
+}
+
+#speichere-stopps {
+  margin-left: 250px;
+}
+
+.stopp-eingabe {
+  display: flex;
+}
+
+.flug-karte {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  background-color: #f9f9f9;
+  transition: box-shadow 0.2s;
+}
+
+.flug-karte:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.hinzufuegen-btn, .hinzufuegen-rueckflug-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hinzufuegen-btn:hover, .hinzufuegen-rueckflug-btn:hover  {
+  background-color: #0073ef;
+}
+
+.rueckflug-btn {
+  background-color: #008b8b;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rueckflug-btn:hover {
+  background-color: rgb(0, 118, 118);
+}
+
+#ladeanimation {     
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); 
+  background: rgba(255,255,255,0.8);
+  padding: 1em 2em;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0, 119, 182, 0.3);
+  z-index: 9999;
+
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+
+
+  .button-l {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: color 0.3s ease;
+    border: 1px solid #4f46e5;
+    border-radius: 6px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .button-l:before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0%;
+    height: 0%;
+    background: linear-gradient(135deg, #4f46e5, #3b82f6);
+    z-index: 0;
+    transition: all 0.4s ease;
+    border-radius: 6px;
+  }
+
+  .button-l:hover::before {
+    width: 100%;
+    height: 100%;
+  }
+
+  .button-l span {
+    position: relative;
+    z-index: 2;
+  }
+
+  .button-l:hover {
+    color: white;
+
+  }
+
+  .button-l:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .stopp-entfernen-btn {
+    background-color: #dc3545;
+  }
+
+  .stopp-entfernen-btn:hover {
+    background-color: #a71d2a;
+  }
+
+  #neuerStopp {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+
+  select {
+    padding: 8px;
+  }
+
+  .obere-buttons {
+    display: flex;
+    float: right;
+  }
+
+  .untere-buttons {
+    display: flex;
+    float: right;
+  }
+
+  .oben-h {
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  #sortierung {
+    height: 5vh;
+    background-color: none;
+    border: 1px solid #4f46e5;
+    border-radius: 6px;
+  }
+
+  #results {
+  max-height: 650px;
+  min-height: 650px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 5px;
+}
+
+  .hotel-card {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+.hotel-card:hover {
+  background-color: #e6f7ff;
+}
+.hotel-card.selected {
+  background-color: #d0f0c0;
+  border: 2px solid #4BB543;
+}
+#results::-webkit-scrollbar {
+  width: 6px;
+}
+#results::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 4px;
+}
+
+.sterne-icons i {
+  color: #FFD700;
+  margin-right: 2px;
+}
+
+.hotel-foto {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+#map {
+  height: 400px;
+  margin-top: 20px;
+}
+
+.entfernen-button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #dc3545;
+  border-radius: 12px;
+  background-color: #dc3545;
+  width: 5vw;
+  height: 3vh;
+  margin: 5px;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entfernen-button:hover {
+  background-color: #a71d2a;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+@media screen and (max-width: 767px) {
+  .sidenav {
+    height: auto;
+    padding: 15px;
+  }
+  .row.content {height:auto;}
+}

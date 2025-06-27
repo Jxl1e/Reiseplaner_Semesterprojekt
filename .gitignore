@@ -1,0 +1,9 @@
+*.pyc
+venv
+.venv
+*cache
+.vscode
+.idea
+.scripts
+
+geonames

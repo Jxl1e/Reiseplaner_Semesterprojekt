@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>{% block tilte %}{% endblock %}</head>
+    <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block meta %}
+  <meta name="description" content="">
+  <meta name="author" content="">
+  {% endblock %}
+
+  {% assets "common_css" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  {% endassets %}
+
+  {% block css %}
+  {% endblock %}
+
+  {% block script %}
+  {% endblock %}
+
+</head>
+
+<body class="{% if request.endpoint in ['auth.login', 'auth.register'] %}auth{% else %}main{% endif %}">
+
+  {% if current_user.is_authenticated %}
+    <nav class="navbar">
+      <!-- Linke Seite -->
+      <div class="nav-left">
+        <a class="nav-item" href="/dashboard">Meine Reisen</a>
+        <a class="nav-item" href="{{ url_for('.add') }}">Reise planen</a>
+      </div>
+
+      <!-- Rechte Seite -->
+      <div class="nav-right">
+        <span class="nav-item-nk">{{ current_user.email }}</span>
+        <a class="nav-item" href="/logout">Logout</a>
+      </div>
+    </nav>
+  {% endif %}
+
+ 
+
+
+  <main class="container full-viewport">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash_wrapper">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            {{ message }}
+            </div>
+          {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+    {% block body %}{% endblock %}
+  </main>
+
+
+</body>
+</html>

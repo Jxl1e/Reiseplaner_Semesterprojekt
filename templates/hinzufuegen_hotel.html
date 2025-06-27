@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Hotel hinzufügen{% endblock %}
+
+
+{% block body %}
+<h1>Reise bearbeiten > Hotel hinzufuegen</h1>
+<div class="oben-h">
+  <input id="hotelInput" type="text" placeholder="Hotelname eingeben" />  
+  <div class="untere-buttons">
+    
+      <div class="abbrechen">
+      {% if reise.reiseart == 'roadtrip' %}
+        {% set detail_url = url_for('reisen.edit', reise_id=reise._id) %}
+      {% elif reise.reiseart == 'städtetrip' %}
+        {% set detail_url = url_for('reisen.edit_staedtetrip', reise_id=reise._id) %}
+      {% elif reise.reiseart == 'badeurlaub' %}
+        {% set detail_url = url_for('reisen.edit_badeurlaub', reise_id=reise._id) %}
+      {% else %}
+        {% set detail_url = '#' %}
+      {% endif %}
+        <a class="button_abr" style="text-decoration: none;" data-url="{{ detail_url }}"><span>Zurück</span></a>
+      </div>
+
+      <button id="addHotelBtn"  class="button" disabled><span>Hotel hinzufügen</span></button>
+    </div>
+  </div>
+
+  
+  <div id="results"></div>
+
+  <div id="map"></div>
+
+  <div id="toast" style="
+  visibility: hidden;
+  opacity: 0;
+  min-width: 250px;
+  background-color: #4BB543;
+  color: white;
+  text-align: center;
+  border-radius: 8px;
+  padding: 12px;
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  z-index: 9999;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+  Erfolgreich hinzugefügt!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+  <script>
+
+  function sterne(rating) {
+  const volle = Math.floor(rating);
+  const dezimal = rating - volle;
+  const halber = dezimal >= 0.25 && dezimal < 0.75 ? 1 : 0;
+  const vollPlus = dezimal >= 0.75 ? 1 : 0;
+  const leer = 5 - volle - halber - vollPlus;
+
+  let html = '';
+  html += '<i class="fas fa-star"></i>'.repeat(volle + vollPlus);
+  if (halber) html += '<i class="fas fa-star-half-alt"></i>';
+  html += '<i class="far fa-star"></i>'.repeat(leer);
+  return html;
+}
+
+
+    const reiseId = "{{ reise._id or reise.id }}";
+    const map = L.map('map').setView([51.1657, 10.4515], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let selectedHotel = null;
+    let marker = null;
+
+    document.getElementById('hotelInput').addEventListener('input', async (e) => {
+      const query = e.target.value;
+      if(query.length < 3) {
+        document.getElementById('results').innerHTML = '';
+        return;
+      }
+
+      const res = await fetch(`/api/google_places?query=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+
+      if(data.status !== 'OK') {
+        resultsDiv.textContent = 'Keine Ergebnisse.';
+        return;
+      }
+
+const markers = []; // neue Liste für alle Marker
+
+data.results
+  .filter(place => place.geometry && place.geometry.location)
+  .forEach(place => {
+    const div = document.createElement('div');
+    div.className = 'hotel-card';
+
+    const lat = place.geometry.location.lat;
+    const lon = place.geometry.location.lng;
+
+    const priceText = place.price_level != null
+      ? '💶'.repeat(place.price_level) || 'Kostenlos'
+      : 'Preisinfo nicht verfügbar';
+
+    const photoUrl = place.photos && place.photos.length > 0
+      ? `/api/place_photo?photo_reference=${place.photos[0].photo_reference}`
+      : 'https://via.placeholder.com/400x200?text=Kein+Bild';
+
+    div.innerHTML = `
+      <img src="${photoUrl}" alt="${place.name}" class="hotel-foto" />
+      <h3>${place.name}</h3>
+      <p>${place.formatted_address}</p>
+      <p>${place.rating != null
+        ? `Bewertung: <span class="sterne-icons">${sterne(place.rating)}</span> (${place.rating})`
+        : 'Keine Bewertung'}</p>
+      <p>${priceText}</p>
+    `;
+  div.onclick = () => {
+    selectedHotel = place;
+    document.getElementById('addHotelBtn').disabled = false;
+
+    // optisch markieren
+    document.querySelectorAll('.hotel-card').forEach(c => c.classList.remove('selected'));
+    div.classList.add('selected');
+
+    if (marker) map.removeLayer(marker);
+    const lat = place.geometry.location.lat;
+    const lon = place.geometry.location.lng;
+    marker = L.marker([lat, lon]).addTo(map).bindPopup(place.name).openPopup();
+    map.setView([lat, lon], 15);
+  };
+
+  resultsDiv.appendChild(div);
+
+  // Marker für alle Ergebnisse hinzufügen
+  const resultMarker = L.marker([
+    place.geometry.location.lat,
+    place.geometry.location.lng
+  ])
+    .addTo(map)
+    .bindPopup(`<strong>${place.name}</strong><br>${place.formatted_address}`);
+
+  markers.push(resultMarker);
+});
+
+// Alte Marker entfernen
+markers.forEach(m => map.removeLayer(m));
+markers.length = 0;
+    });
+
+    document.getElementById('addHotelBtn').addEventListener('click', async () => {
+      if(!selectedHotel) return zeigeToastError('Bitte Hotel auswählen.');
+
+      const hotelData = {
+        name: selectedHotel.name,
+        address: selectedHotel.formatted_address,
+        lat: selectedHotel.geometry.location.lat,
+        lon: selectedHotel.geometry.location.lng,
+        place_id: selectedHotel.place_id,
+        // Optional: weitere Daten hinzufügen
+      };
+
+      const res = await fetch(`/reisen/${reiseId}/hotels`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(hotelData),
+      });
+
+      if(res.ok) {
+        zeigeToast('Hotel erfolgreich hinzugefügt!');
+      } else {
+        zeigeToastError('Fehler beim Hinzufügen.');
+      }
+    });
+
+    document.querySelectorAll('.button_abr').forEach(card => {
+  const url = card.getAttribute('data-url');
+  if (url) {
+    card.style.cursor = 'pointer'; 
+
+    card.addEventListener('click', () => {
+      window.location.href = url;
+    });
+
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'link');
+
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = url;
+      }
+    });
+  }
+});
+
+console.log(document.querySelector('.button_abr').getAttribute('data-url'));
+
+  function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.style.visibility = "visible";
+    toast.style.opacity = "1";
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.visibility = "hidden";
+    }, dauer);
+  }
+
+  function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+  </script>
+{% endblock %}

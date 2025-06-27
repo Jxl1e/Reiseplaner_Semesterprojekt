@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Registrieren{% endblock %}
+
+{% block body %}
+<style>
+  body {
+  height: 100vh;
+  width: 100vw;
+  background-image: url('/static/images/Dom_Rep_Strand.jpg');
+  background-size: cover;
+  background-position: right;
+  background-repeat: no-repeat;
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+</style>
+<div class="login-wrapper">
+    <div class="card_a">
+        <h1>Registrieren</h1>
+        <form action="/register" method="POST">
+            <p><input type="email" name="email" placeholder="E-Mail registrieren" required></p>
+            <p><input name="password" type="password" placeholder="Passwort" required></p>
+            <p style="display: flex; justify-content: center;"><button class="button" type="submit"><span>Registrieren</span></button></p>
+            <p style="display: flex; justify-content: center;">Account schon erstellt? <a class="link" href="/login">Anmelden</a></p>
+        </form>
+    </div>
+</div>
+{% endblock %}

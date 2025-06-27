@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Flug hinzufügen{% endblock %}
+
+{% block body %}
+<p class="hinweis">
+  ✈️ Hinweis: In der Testumgebung stehen nur ausgewählte Flughäfen (z.B. FRA, JFK, LHR, MAD) zur Verfügung.
+</p>
+
+  <form id="flug-form">
+    <input type="text" id="von" placeholder="Start (z.B. Berlin)" required style="margin-bottom: 5px;">
+    <input type="text" id="nach" placeholder="Ziel (z.B. New York)" required>
+    <input type="date" id="anreise" required>
+
+    <select id="sortierung">
+    <option value="asc">Preis aufsteigend</option>
+    <option value="desc">Preis absteigend</option>
+    </select>
+  <div class="obere-buttons">
+    <div class="abbrechen">
+    {% if reise.reiseart == 'roadtrip' %}
+      {% set detail_url = url_for('reisen.edit', reise_id=reise._id) %}
+    {% elif reise.reiseart == 'städtetrip' %}
+      {% set detail_url = url_for('reisen.edit_staedtetrip', reise_id=reise._id) %}
+    {% elif reise.reiseart == 'badeurlaub' %}
+      {% set detail_url = url_for('reisen.edit_badeurlaub', reise_id=reise._id) %}
+    {% else %}
+      {% set detail_url = '#' %}
+    {% endif %}
+    <a class="button_abr" style="text-decoration: none;" data-url="{{ detail_url }}"><span>Zurück</span></a>
+  </div>
+    <button type="submit" class="button"><span>Flüge suchen</span></button>
+  </form>
+
+  
+</div>
+
+
+<div id="ladeanimation">
+
+  <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- Animationspfad (Flugbahn) -->
+    <path id="flugbahn" d="M30,110 C70,70 140,40 200,40 S330,70 370,110" stroke="#0077b6" stroke-width="2" fill="none" />
+
+    <!-- Flugzeug-Grafik aus deinem Code -->
+    <g id="flugzeug" transform="scale(0.08, -0.08)">
+      <g transform="translate(-950,-950)" fill="black" stroke="none">
+        <path d="M501 1243 c15 -39 27 -52 92 -94 60 -39 101 -81 90 -93 -3 -3 2 -6
+          11 -6 22 0 96 -40 96 -52 0 -9 -1 -9 -174 -43 l-130 -26 -91 91 c-70 70 -97
+          90 -118 90 -16 0 -30 -7 -33 -15 -4 -9 3 -53 15 -100 11 -46 21 -86 21 -89 0
+          -2 -26 4 -58 13 -86 26 -106 13 -38 -24 51 -27 54 -31 39 -47 -23 -25 -10 -35
+          59 -42 35 -4 67 -11 73 -15 19 -15 355 6 463 29 86 18 109 20 133 10 22 -9 32
+          -10 43 -1 10 8 21 8 45 -2 17 -7 28 -17 24 -21 -5 -4 4 -5 20 -1 28 8 39 -8
+          12 -19 -20 -7 -19 -42 1 -50 26 -10 44 -7 44 8 0 16 34 31 49 22 5 -3 30 1 57
+          8 27 8 70 17 96 21 52 7 74 30 63 65 -5 17 -16 20 -73 20 -60 0 -65 1 -51 16
+          10 9 85 29 190 50 156 31 175 33 185 19 7 -9 10 -24 7 -34 -3 -11 2 -21 11
+          -24 20 -8 31 10 16 28 -24 29 -2 52 69 74 130 39 142 76 42 125 -75 36 -74 36
+          -483 -43 l-307 -59 -183 68 c-248 91 -253 94 -289 134 -37 43 -52 46 -38 9z"/>
+      </g>
+    </g>
+
+    <!-- AnimateMotion: Das Flugzeug auf der Flugbahn bewegen & mitdrehen -->
+    <animateMotion xlink:href="#flugzeug" dur="5s" repeatCount="indefinite" rotate="auto">
+      <mpath xlink:href="#flugbahn" />
+    </animateMotion>
+
+  </svg>
+
+  <p style="text-align: center; color:#0077b6; font-weight: bold; margin-top: 0.5em;">
+    Flüge werden geladen...
+  </p>
+
+</div>
+
+
+<div id="fluege-container"></div>
+
+  <div id="toast" style="
+  visibility: hidden;
+  opacity: 0;
+  min-width: 250px;
+  background-color: #4BB543;
+  color: white;
+  text-align: center;
+  border-radius: 8px;
+  padding: 12px;
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  z-index: 9999;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+  Erfolgreich hinzugefügt!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+
+<script>
+document.getElementById('flug-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const ortVon = document.getElementById('von').value.trim();
+  const ortNach = document.getElementById('nach').value.trim();
+  const anreise = document.getElementById('anreise').value;
+
+  let von, nach;
+  try {
+    von = await getIataCode(ortVon);
+    nach = await getIataCode(ortNach);
+  } catch (err) {
+    zeigeToastError("Fehler beim Auflösen der Orte zu Flughäfen.");
+    return;
+  }
+
+  document.getElementById("ladeanimation").style.display = "flex";
+  const res = await fetch("/api/suche_fluege", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start: von,
+      ziel: nach,
+      startdatum: anreise,
+    })
+  });
+
+  const container = document.getElementById("fluege-container");
+  container.innerHTML = "";
+  document.getElementById("ladeanimation").style.display = "none";
+
+  let data;
+  try {
+    const text = await res.text();
+    data = JSON.parse(text);
+  } catch (e) {
+    console.error("Fehler beim Parsen der JSON-Antwort:", e);
+    container.innerHTML = "<p>Fehler beim Laden der Flüge.</p>";
+    return;
+  }
+
+  const fluege = data.data || [];
+  const sortierung = document.getElementById("sortierung").value;
+  fluege.sort((a, b) => {
+    const preisA = parseFloat(a.price.total);
+    const preisB = parseFloat(b.price.total);
+    return sortierung === "asc" ? preisA - preisB : preisB - preisA;
+  });
+
+  if (!fluege.length) {
+    container.innerHTML = "<p>Keine Flüge gefunden.</p>";
+    return;
+  }
+
+  fluege.forEach((flug, index) => {
+    const segment = flug.itineraries[0].segments[0];
+    const carrierCode = segment.carrierCode;
+    const origin = segment.departure.iataCode;
+    const destination = segment.arrival.iataCode;
+    const departure = new Date(segment.departure.at).toLocaleString();
+    const arrival = new Date(segment.arrival.at).toLocaleString();
+    const price = flug.price.total;
+
+    const div = document.createElement("div");
+    div.classList.add("flug-karte");
+    div.innerHTML = `
+      <p><strong>${origin} → ${destination}</strong> mit ${carrierCode}<br>
+         🛫 ${departure}<br>
+         🛬 ${arrival}<br>
+         💶 Preis: <strong>${price} €</strong></p>
+      <button class="hinzufuegen-btn" data-index="${index}">Flug hinzufügen</button>
+      <button class="rueckflug-btn" data-origin="${destination}" data-destination="${origin}">
+        Rückflug suchen
+      </button>
+      <hr>
+    `;
+    container.appendChild(div);
+
+    // Hinflug hinzufügen
+    div.querySelector(".hinzufuegen-btn").addEventListener("click", async () => {
+      const res = await fetch("/api/flug_hinzufuegen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flug, reise_id: "{{ reise._id }}" })
+      });
+
+      if (res.ok) {
+        zeigeToast("Flug wurde zur Reise hinzugefügt!");
+      } else {
+        zeigeToastError("Fehler beim Hinzufügen.");
+      }
+    });
+
+    // Rückflug suchen
+    div.querySelector(".rueckflug-btn").addEventListener("click", async () => {
+      const rueckDatum = prompt("Rückflug-Datum eingeben (YYYY-MM-DD):");
+      if (!rueckDatum) return;
+
+      const origin = div.querySelector(".rueckflug-btn").dataset.origin;
+      const destination = div.querySelector(".rueckflug-btn").dataset.destination;
+
+      document.getElementById("ladeanimation").style.display = "flex";
+      const rueckRes = await fetch("/api/suche_fluege", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start: origin,
+          ziel: destination,
+          startdatum: rueckDatum
+        })
+      });
+      document.getElementById("ladeanimation").style.display = "none";
+      const rueckData = await rueckRes.json();
+      const rueckflug = (rueckData.data || [])[0];
+
+      if (!rueckflug) {
+        zeigeToastError("Kein Rückflug gefunden.");
+        return;
+      }
+
+      const seg = rueckflug.itineraries[0].segments[0];
+      const rueckCarrier = seg.carrierCode;
+      const rueckDeparture = new Date(seg.departure.at).toLocaleString();
+      const rueckArrival = new Date(seg.arrival.at).toLocaleString();
+      const rueckPrice = rueckflug.price.total;
+
+      const rueckDiv = document.createElement("div");
+      rueckDiv.classList.add("flug-karte");
+      rueckDiv.style.backgroundColor = "#e7f7ff";
+      rueckDiv.innerHTML = `
+        <p><strong>Rückflug: ${origin} → ${destination}</strong> mit ${rueckCarrier}<br>
+           🛫 ${rueckDeparture}<br>
+           🛬 ${rueckArrival}<br>
+           💶 Preis: <strong>${rueckPrice} €</strong></p>
+        <button class="hinzufuegen-rueckflug-btn">Rückflug hinzufügen</button>
+        <hr>
+      `;
+      div.after(rueckDiv);
+
+      rueckDiv.querySelector(".hinzufuegen-rueckflug-btn").addEventListener("click", async () => {
+        const res = await fetch("/api/flug_hinzufuegen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flug: rueckflug, reise_id: "{{ reise._id }}" })
+        });
+
+        if (res.ok) {
+          zeigeToast("Rückflug zur Reise hinzugefügt!");
+        } else {
+          zeigeToastError("Fehler beim Hinzufügen des Rückflugs.");
+        }
+      });
+    });
+  });
+});
+
+// Ortsname → IATA-Code
+async function getIataCode(ort) {
+  const res = await fetch(`/api/get_iata_code?ort=${encodeURIComponent(ort)}`);
+  const data = await res.json();
+  if (!data || !data.code) throw new Error("Kein Flughafen gefunden");
+  return data.code;
+}
+
+document.querySelectorAll('.button_abr').forEach(card => {
+  const url = card.getAttribute('data-url');
+  if (url) {
+    card.style.cursor = 'pointer'; 
+
+    card.addEventListener('click', () => {
+      window.location.href = url;
+    });
+
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'link');
+
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = url;
+      }
+    });
+  }
+});
+
+function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.style.visibility = "visible";
+    toast.style.opacity = "1";
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.visibility = "hidden";
+    }, dauer);
+  }
+
+  function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+console.log(document.querySelector('.button_abr').getAttribute('data-url'));
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Autovermietung{% endblock %}
+
+{% block body %}
+    <h2>Autovermieter hinzufügen</h2>
+    <p>Diese Seite existiert nicht</p>
+
+    <div class="abbrechen">
+      {% if reise.reiseart == 'roadtrip' %}
+        {% set detail_url = url_for('reisen.edit', reise_id=reise._id) %}
+      {% elif reise.reiseart == 'städtetrip' %}
+        {% set detail_url = url_for('reisen.edit_staedtetrip', reise_id=reise._id) %}
+      {% elif reise.reiseart == 'badeurlaub' %}
+        {% set detail_url = url_for('reisen.edit_badeurlaub', reise_id=reise._id) %}
+      {% else %}
+        {% set detail_url = '#' %}
+      {% endif %}
+        <a class="button_abr" style="text-decoration: none;" data-url="{{ detail_url }}"><span>Zurück</span></a>
+      </div>
+
+    <script>
+          document.querySelectorAll('.button_abr').forEach(card => {
+  const url = card.getAttribute('data-url');
+  if (url) {
+    card.style.cursor = 'pointer'; 
+
+    card.addEventListener('click', () => {
+      window.location.href = url;
+    });
+
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'link');
+
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = url;
+      }
+    });
+  }
+});
+    </script>
+{% endblock %}

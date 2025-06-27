@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block title %}Stopp hinzufügen {% endblock %}
+
+{% block body %}
+<h2>Reise bearbeiten > Stopp hinzufügen</h2>
+
+<div class="oben_e">
+   <div style="display: flex; height: 80vh; width: 100vw;">
+    <div class="karte" id="karte" style="flex: 2; min-width: 0;"></div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; min-width: 0;">
+     <div class="stopp-eingabe">
+        <div>
+            <label for="stopp">Stopp eingeben (PLZ oder Ort):</label>
+            <div class="hinzufuegen-stopp">
+            <div class="autocomplete-wrapper" style="position: relative;">
+                <input type="text" id="stopp" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required style="width: 14vw;">
+                <ul id="autocomplete-list" class="autocomplete-list"></ul>
+            </div>
+            <div id="stopp-tags"></div>
+                <input type="hidden" id="stopp-hidden" name="stopps">
+            </div>
+        
+            <button class="button-l" type="submit">
+                <span>🔍</span>
+            </button>
+        </div>
+    </div>
+    <div id="stopp-info" style="border:1px solid #ccc; padding:10px; border-radius:8px; margin: 10px 0; max-height: 700px; overflow-y: auto;">
+        <em>Informationen zu ausgewähltem Stopp werden hier angezeigt.</em>
+    </div>
+
+    <div id="stopp-liste-container" style="flex: 0 0 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; margin-top: 10px;">
+            <h3>Stopps:</h3>
+            <ul id="stopp-liste" style="list-style-type: none; padding-left: 0; margin: 0;"></ul>
+    </div>
+    </div>
+    </div>
+</div>
+
+
+<div class="stopps-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.edit', reise_id=reise._id)}}"><span>Zurück</span></a>
+    </div>
+    <button id="speichere-stopps" type="button" class="button"><span>Hinzufügen</span></button>
+</div>
+
+<div id="toast" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #4BB543;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich hinzugefügt!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<script>
+    const reiseId = "{{ reise._id }}";
+    let orte = {{ reise.stopps | default([], true) | tojson | safe }};
+    let zielort = {{ reise.zielort | default("", true) | tojson | safe }};
+    let initialMarker = [];
+    let initialPunkte = [];
+    let punkte = [];
+    let markerListe = [];
+    const markerMap = {};
+    let routeLinie = null;
+
+     if (zielort && !orte.includes(zielort)) {
+        orte.push(zielort);
+    }
+
+    karte = L.map('karte').setView([51.1657, 10.4515], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(karte);
+
+    async function ladeUndZeigeRoute() {
+     for (let i = 0; i < orte.length; i++) {
+    const ort = orte[i];
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+    const daten = await res.json();
+    if (daten.length > 0) {
+        let lat = parseFloat(daten[0].lat);
+        let lon = parseFloat(daten[0].lon);
+
+        let marker;
+        if (i === orte.length - 1) {
+            marker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                })
+            }).addTo(karte).bindPopup(ort + " (Ziel)");
+        } else {
+            marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
+        }
+
+        initialMarker.push(marker);
+        markerMap[ort] = marker;
+        initialPunkte.push([lat, lon]);
+    }
+}
+        punkte = [...initialPunkte];
+        markerListe = [...initialMarker];
+        zeichneRoute();
+
+
+        aktualisiereStoppListe();
+    }
+
+   async function zeichneRoute() {
+    if (punkte.length <= 1) return;
+
+    if (routeLinie) karte.removeLayer(routeLinie);
+
+    const body = {
+        coordinates: punkte.map(p => [p[1], p[0]]),
+        format: "geojson"
+    };
+
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+        method: 'POST',
+        headers: {
+            'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
+    karte.fitBounds(routeLinie.getBounds());
+
+    const summary = data.features?.[0]?.properties?.summary;
+    if (summary) {
+        const distKm = (summary.distance / 1000).toFixed(1);
+        const dauerMin = Math.round(summary.duration / 60);
+        const std = Math.floor(dauerMin / 60);
+        const min = dauerMin % 60;
+
+        const infoZ = document.querySelector(".info-z");
+        const infoE = document.querySelector(".info-e");
+
+        if (infoZ) {
+            infoZ.textContent = `Reisezeit: ${std}h ${min}min`;
+        }
+
+        if (infoE) {
+            infoE.textContent = `Entfernung: ${distKm} km`;
+        }
+    }
+}
+
+
+function aktualisiereStoppListe() {
+    const liste = document.getElementById("stopp-liste");
+    console.log("Liste gefunden:", liste);
+    liste.innerHTML = "";
+
+    // Liste mit Drag & Drop Items füllen
+    orte.forEach((ort, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+    ${ort}
+    <button style="float:right; background:none; border:none; color:red; cursor:pointer;" onclick="entferneStopp('${ort}')">✖</button>`;
+
+        li.setAttribute("data-index", index);
+        li.style.padding = "5px 10px";
+        li.style.margin = "4px 0";
+        li.style.border = "1px solid #ccc";
+        li.style.borderRadius = "6px";
+        li.style.cursor = "grab";
+        liste.appendChild(li);
+    });
+
+    if (liste._sortable) {
+        liste._sortable.destroy();  
+    }
+
+    liste._sortable = Sortable.create(liste, {
+        animation: 150,
+        onEnd: function (evt) {
+            const altIndex = evt.oldIndex;
+            const neuIndex = evt.newIndex;
+
+            const ort = orte.splice(altIndex, 1)[0];
+            orte.splice(neuIndex, 0, ort);
+
+            const punkt = punkte.splice(altIndex, 1)[0];
+            punkte.splice(neuIndex, 0, punkt);
+
+            // Alle Marker (inkl. Zielmarker) entfernen
+            markerListe.forEach(m => karte.removeLayer(m));
+            Object.values(markerMap).forEach(m => karte.removeLayer(m));
+            markerListe = [];
+            Object.keys(markerMap).forEach(k => delete markerMap[k]);
+
+            // Marker neu setzen
+            punkte.forEach((latlng, i) => {
+                const ort = orte[i];
+                let marker;
+
+                if (i === orte.length - 1) {
+                    // Zielmarker
+                    marker = L.marker(latlng, {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 30],
+                            popupAnchor: [0, -30]
+                        })
+                    }).addTo(karte).bindPopup(ort + " (Ziel)");
+                } else {
+                    marker = L.marker(latlng).addTo(karte).bindPopup(ort);
+                }
+
+                markerListe.push(marker);
+                markerMap[ort] = marker;
+            });
+
+
+            zeichneRoute();
+            
+        }
+    });
+}
+
+async function addOrtAufKarte(ortName) {
+    if (orte.includes(ortName)) return; // doppelte Einträge vermeiden
+    orte.push(ortName);
+
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ortName)}`);
+    const daten = await res.json();
+    if (daten.length > 0) {
+        const lat = parseFloat(daten[0].lat);
+        const lon = parseFloat(daten[0].lon);
+
+        punkte.push([lat, lon]);
+
+        // Marker hinzufügen
+        const marker = L.marker([lat, lon]).addTo(karte).bindPopup(ortName);
+        markerListe.push(marker);
+        markerMap[ortName] = marker;
+
+        zeichneRoute();
+        aktualisiereStoppListe();
+        speichereStoppreihenfolge();
+        zeigeStoppInfos(ortName, lat, lon);
+    } else {
+        zeigeToastError("Ort nicht gefunden: " + ortName);
+    }
+}
+document.querySelector('.stopp-eingabe button').addEventListener('click', (e) => {
+    e.preventDefault();
+    const val = document.getElementById('stopp').value.trim();
+    if (val) {
+        addOrtAufKarte(val);
+        document.getElementById('stopp').value = '';
+    }
+});
+document.getElementById('stopp').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        if (val) {
+            addOrtAufKarte(val);
+            e.target.value = '';
+        }
+    }
+});
+function entferneStopp(name) {
+    const index = orte.indexOf(name);
+    if (index !== -1) {
+        orte.splice(index, 1);
+        punkte.splice(index, 1);
+
+        // Marker von der Karte entfernen
+        const marker = markerMap[name];
+        if (marker) {
+            karte.removeLayer(marker);
+            delete markerMap[name];
+        }
+
+        // Liste aktualisieren (neu zeichnen)
+        aktualisiereStoppListe();
+
+        // Route neu zeichnen
+        zeichneRoute();
+
+        // Wenn der aktuell angezeigte Ort entfernt wird → Infofeld leeren
+    const infoDiv = document.getElementById("stopp-info");
+    const aktuellerTitel = infoDiv.querySelector("h3");
+    if (aktuellerTitel && aktuellerTitel.textContent === name) {
+    infoDiv.innerHTML = "<em>Informationen zu ausgewähltem Stopp werden hier angezeigt.</em>";
+}
+
+    }
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    ladeUndZeigeRoute();
+
+    // Zielland z.B. aus Template oder statisch
+    const zielland = "{{ reise.zielland | default('DE') }}";
+    initStopps(zielland);
+});
+
+function initStopps(zielland) {
+    const input = document.getElementById('stopp');
+    const list = document.getElementById('autocomplete-list');
+    const tagContainer = document.getElementById('stopp-tags');
+    const hiddenField = document.getElementById('stopp-hidden');
+    const stopps = [];
+
+    // Bereits gesetzte Stopps aus hidden field laden
+    if (hiddenField.value.trim()) {
+        hiddenField.value.split(',').forEach(stop => {
+            const trimmed = stop.trim();
+            if (trimmed) stopps.push(trimmed);
+        });
+        updateTagUI();
+    }
+
+    function addStopp(name) {
+    const normalized = name.toLowerCase();
+    if (stopps.some(s => s.toLowerCase() === normalized)) return;
+
+    stopps.push(name);
+    updateTagUI();
+    input.value = '';
+    list.style.display = 'none';
+    hiddenField.value = stopps.join(',');
+
+    // 🔽 NEU: Ort auf Karte + Route hinzufügen
+    addOrtAufKarte(name);   
+    }
+
+
+    function removeStopp(name) {
+        const index = stopps.findIndex(s => s === name);
+        if (index !== -1) {
+            stopps.splice(index, 1);
+            updateTagUI();
+            hiddenField.value = stopps.join(',');
+        }
+    }
+
+    function updateTagUI() {
+        tagContainer.innerHTML = '';
+        stopps.forEach(name => {
+            const tag = document.createElement('div');
+            tag.textContent = name;
+            tag.className = 'tag';
+            tag.style.cssText = 'display:inline-block;margin:5px;padding:5px 10px;background:#ccc;border-radius:15px';
+
+            const remove = document.createElement('button');
+            remove.textContent = '✖';
+            remove.style.cssText = 'margin-left:8px;background:none;border:none;cursor:pointer';
+            remove.addEventListener('click', () => removeStopp(name));
+
+            tag.appendChild(remove);
+            tagContainer.appendChild(tag);
+        });
+    }
+
+    input.addEventListener('input', async () => {
+        const query = input.value.trim();
+        if (query.length < 2 || !zielland) {
+            list.style.display = 'none';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/autocomplete_ort?q=${encodeURIComponent(query)}&country=${encodeURIComponent(zielland)}`);
+            const data = await response.json();
+            list.innerHTML = '';
+
+            if (!data.results || data.results.length === 0) {
+                list.style.display = 'none';
+                return;
+            }
+
+            data.results.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                li.style.cssText = 'cursor:pointer;padding:5px';
+                li.addEventListener('click', () => addStopp(item));
+                list.appendChild(li);
+            });
+
+            list.style.cssText = 'position:absolute;width:100%;top:100%;left:0;z-index:1000;display:block';
+
+        } catch (err) {
+            console.error("Fehler bei Autocomplete:", err);
+            list.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (val) addStopp(val);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!list.contains(e.target) && e.target !== input) {
+            list.style.display = 'none';
+        }
+    });
+
+    document.querySelector('form').addEventListener('submit', (e) => {
+        const val = input.value.trim();
+        if (val && !stopps.some(s => s.toLowerCase() === val.toLowerCase())) {
+            addStopp(val);
+        }
+    });
+}
+
+function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+async function zeigeStoppInfos(name, lat, lon) {
+  const infoDiv = document.getElementById("stopp-info");
+  infoDiv.innerHTML = `<p><strong>${name}</strong> wird geladen...</p>`;
+
+// Entfernt Postleitzahl, falls vorhanden (z. B. "10115 Berlin" → "Berlin")
+function bereinigeOrtname(ort) {
+  const teile = ort.trim().split(" ");
+  if (teile.length > 1 && /^\d{4,5}$/.test(teile[0])) {
+    return teile.slice(1).join(" ");
+  }
+  return ort;
+}
+
+  // Wikipedia API: suche Beschreibung zu Stopp
+  async function holeWikiBeschreibung(query) {
+    try {
+      const url = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&format=json&origin=*&titles=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const pages = data.query.pages;
+      const page = Object.values(pages)[0];
+      return page.extract || "Keine Beschreibung gefunden.";
+    } catch {
+      zeigeToastError("Fehler beim Laden der Wikipedia-Daten.");
+    }
+  }
+
+  // Overpass API: Sehenswürdigkeiten in ~500m Radius
+  async function holeSehenswuerdigkeiten(lat, lon) {
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["tourism"="attraction"](around:500,${lat},${lon});
+        way["tourism"="attraction"](around:500,${lat},${lon});
+        relation["tourism"="attraction"](around:500,${lat},${lon});
+      );
+      out center 5;
+    `;
+    try {
+      const res = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: query,
+        headers: {
+          "Content-Type": "text/plain"
+        }
+      });
+      const data = await res.json();
+      if (!data.elements || data.elements.length === 0) {
+        return [];
+      }
+      return data.elements.map(el => el.tags.name).filter(Boolean).slice(0, 5);
+    } catch {
+      return [];
+    }
+  }
+
+  // Infos holen
+    const bereinigterName = bereinigeOrtname(name);
+    const beschreibung = await holeWikiBeschreibung(bereinigterName);
+    const sehenswuerdigkeiten = await holeSehenswuerdigkeiten(lat, lon);
+
+  // Ergebnis anzeigen
+  let html = `<h3>${name}</h3>`;
+  html += `<p>${beschreibung}</p>`;
+
+  if (sehenswuerdigkeiten.length > 0) {
+    html += "<h4>Sehenswürdigkeiten in der Nähe:</h4><ul>";
+    sehenswuerdigkeiten.forEach(item => {
+      html += `<li>${item}</li>`;
+    });
+    html += "</ul>";
+  } else {
+    html += "<p>Keine Sehenswürdigkeiten in der Nähe gefunden.</p>";
+  }
+
+  infoDiv.innerHTML = html;
+}
+
+ document.getElementById("speichere-stopps").addEventListener("click", async () => {
+  try {
+    const response = await fetch(`/hinzufuegen/${reiseId}/stopps`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        stopps: orte
+      })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      zeigeToast("Stopps gespeichert!");
+setTimeout(() => {
+  window.location.href = `/edit/${reiseId}`;
+}, 1500);
+    } else {
+      zeigeToastError("Fehler: " + result.message);
+    }
+  } catch (error) {
+    console.error("Fehler beim Speichern:", error);
+    zeigeToastError("Es ist ein Fehler aufgetreten.");
+  }
+});
+
+
+
+
+
+
+</script>
+{% endblock %}

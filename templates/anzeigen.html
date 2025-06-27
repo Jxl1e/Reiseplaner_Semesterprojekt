@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+
+{% block title %}Reise anzeigen {% endblock %}
+
+{% block body %}
+<h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland }}</h2>
+
+<div class="oben_e">
+   <div style="display: flex; height: 80vh; width: 100vw;">
+    <div class="karte" id="karte" style="flex: 2; min-width: 0;"></div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; min-width: 0;">
+        <div class="info" style="flex: 1; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; min-height: 0; scrollbar-width: thin;">
+            <div id="detail-container">
+                <div id="detail-karte" style="height: 300px; margin-bottom: 10px;"></div>
+                <div id="detail-info"></div>
+                <div style="margin-top: 10px; text-align: center;">
+                    <button id="btn-zurueck" class="button" style="margin-right: 10px; border-radius: 6px;"><span>←</span></button>
+                    <button id="btn-weiter" class="button"><span>→</span></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-Hotel-Flug">
+            {% if reise.fluege and reise.fluege | length >= 1 %}
+            <div>
+                <h6><strong>✈️ Flugdetails</strong></h6>
+                <p id="flugInfo">Lade Fluginformationen...</p>
+            </div>
+            {% else %}
+                <p>✈️ Keine Flugdaten verfügbar.</p>
+            {% endif %}
+
+            {% if reise.hotels and reise.hotels | length > 0 %}
+            <div>
+                <h6><strong>🏨 Hotels</strong></h6>
+                <ul>
+                {% for hotel in reise.hotels %}
+                    <li>
+                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
+                    <br>
+                    <small>{{ hotel.address }}</small>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <p>🏨 Keine Hotelinformationen verfügbar.</p>
+            {% endif %}
+            <p id="preisInfo"></p>
+        </div>
+        <div class="linie"></div>
+        <div class="preis">
+            <p>Gesamtpreis</p>
+            <div id="gesamtPreis"></div>
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="anzeigen-buttons">
+    <div class="abbrechen">
+            <a class="button_abr" style="text-decoration: none;" href="/"><span>Zurück</span></a>
+    </div>
+    <a href="{{ url_for('reisen.edit', reise_id=reise._id) }}" class="button" style="text-decoration: none;"><span>Reise bearbeiten</span></a>
+</div>
+
+<script>
+    let orte = {{ reise.stopps | default([], true) | tojson | safe }};
+    let zielort = {{ reise.zielort | default("", true) | tojson | safe }};
+    const fluege = {{ reise.fluege | default([]) | tojson | safe }};
+    const hotels = {{ reise.hotels | default([]) | tojson | safe }};
+    let initialMarker = [];
+    let initialPunkte = [];
+    let punkte = [];
+    let markerListe = [];
+    let routeLinie = null;
+     if (zielort && !orte.includes(zielort)) {
+        orte.push(zielort);
+    }
+
+    karte = L.map('karte').setView([51.1657, 10.4515], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(karte);
+
+    async function ladeUndZeigeRoute() {
+     for (let i = 0; i < orte.length; i++) {
+    const ort = orte[i];
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+    const daten = await res.json();
+    if (daten.length > 0) {
+        let lat = parseFloat(daten[0].lat);
+        let lon = parseFloat(daten[0].lon);
+
+        let marker;
+        if (i === orte.length - 1) {
+            // Letzter Ort = Ziel → anderer Marker
+            marker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                })
+            }).addTo(karte).bindPopup(ort + " (Ziel)");
+        } else {
+            marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
+        }
+
+        initialMarker.push(marker);
+        initialPunkte.push([lat, lon]);
+    }
+}
+        punkte = [...initialPunkte];
+        markerListe = [...initialMarker];
+        zeichneRoute();
+
+
+        await zeigeInfosZuOrten();
+        aktualisiereStoppListe();
+    }
+    async function zeichneRoute() {
+    if (punkte.length <= 1) return;
+
+    if (routeLinie) karte.removeLayer(routeLinie);
+
+    const body = {
+        coordinates: punkte.map(p => [p[1], p[0]]),
+        format: "geojson"
+    };
+
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+        method: 'POST',
+        headers: {
+            'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
+    karte.fitBounds(routeLinie.getBounds());
+
+    const summary = data.features?.[0]?.properties?.summary;
+    if (summary) {
+        const distKm = (summary.distance / 1000).toFixed(1);
+        const dauerMin = Math.round(summary.duration / 60);
+        const std = Math.floor(dauerMin / 60);
+        const min = dauerMin % 60;
+
+        const infoBox = document.getElementById("routen-info");
+        if (infoBox) {
+            infoBox.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
+        } else {
+            const box = document.createElement("div");
+            box.id = "routen-info";
+            box.style.marginTop = "10px";
+            box.style.fontWeight = "bold";
+            box.style.fontSize = "1rem";
+            box.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
+            document.querySelector(".info")?.prepend(box);
+        }
+    }
+
+    zeigeHotels();
+}
+
+console.log("zeigeHotels wird ausgeführt");
+function zeigeHotels() {
+    for (const hotel of hotels) {
+        const koord = [hotel.lat, hotel.lon];
+        L.marker(koord, {
+            icon: L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/139/139899.png',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30]
+            })
+        })
+        .addTo(karte)
+        .bindPopup(`<b>${hotel.name || "Hotel"}</b><br>${hotel.address}`);
+    }
+}
+
+
+
+    async function ladeWikiInfo(ort) {
+    const ortOhnePLZ = ort.replace(/^\d{4,5}\s+/, '').trim();
+
+    const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(ortOhnePLZ)}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Fehler beim Laden von Wikipedia: ${res.status}`);
+        const data = await res.json();
+
+        if (data.title && data.extract) {
+            return {
+                title: data.title,
+                extract: data.extract,
+                thumbnail: data.thumbnail?.source || null,
+                pageUrl: `https://de.wikipedia.org/wiki/${encodeURIComponent(data.title)}`
+            };
+        } else {
+            return null;
+        }
+    } catch (err) {
+        console.warn(`Keine Wikipedia-Info für ${ortOhnePLZ}: ${err}`);
+        return null;
+    }
+}
+
+
+    function buildOverpassQuery(lat, lon, radius = 1000) {
+        return `
+    [out:json][timeout:25];
+    (
+      node["tourism"="attraction"](around:${radius},${lat},${lon});
+      way["tourism"="attraction"](around:${radius},${lat},${lon});
+      relation["tourism"="attraction"](around:${radius},${lat},${lon});
+    );
+    out center 10;
+    `;
+    }
+
+
+    async function holeSehenswuerdigkeiten(lat, lon) {
+        const query = buildOverpassQuery(lat, lon);
+        try {
+            const res = await fetch("https://overpass-api.de/api/interpreter", {
+                method: "POST",
+                body: query,
+                headers: {
+                    'Content-Type': 'text/plain'
+                }
+            });
+            if (!res.ok) throw new Error("Fehler bei Overpass API");
+            const data = await res.json();
+            return data.elements;
+        } catch (e) {
+            console.warn("Overpass API Fehler:", e);
+            return [];
+        }
+    }
+
+    let aktuelleInfoIndex = 0;
+    let infoDivs = [];
+
+async function zeigeInfosZuOrten() {
+    const infoContainer = document.querySelector('.info');
+    infoContainer.innerHTML = ''; 
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.margin = "10px 0";
+    buttonContainer.style.textAlign = "center";
+
+    function createButtonWithSpan(text, disabled = false) {
+  const btn = document.createElement('button');
+  btn.disabled = disabled;
+  btn.classList.add("nav-button");
+
+  const span = document.createElement('span');
+  span.textContent = text;
+
+  btn.appendChild(span);
+  return btn;
+    }
+
+const btnNext = createButtonWithSpan(" →", true);
+const btnPrev = createButtonWithSpan("← ", false);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.marginTop = "10px";
+    btnGroup.classList.add('ort-button-container');
+
+    infoDivs = [];
+
+    for (let i = 0; i < orte.length; i++) {
+        const ort = orte[i];
+        const ortOhnePLZ = ort.replace(/^\d{4,5}\s+/, '').trim();
+
+        const wikiInfo = await ladeWikiInfo(ort);
+
+        let lat, lon;
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+            const daten = await res.json();
+            if (daten.length > 0) {
+                lat = parseFloat(daten[0].lat);
+                lon = parseFloat(daten[0].lon);
+            } else {
+                console.warn(`Ort ${ort} nicht gefunden für POIs.`);
+                continue;
+            }
+        } catch {
+            console.warn(`Fehler bei Nominatim für ${ort}`);
+            continue;
+        }
+
+        const pois = await holeSehenswuerdigkeiten(lat, lon);
+
+        const ortDiv = document.createElement('div');
+        ortDiv.classList.add('detail-box');
+
+        if (wikiInfo) {
+            ortDiv.innerHTML += `
+                <h3>Info zu ${wikiInfo.title}</h3>
+                ${wikiInfo.thumbnail ? `<img src="${wikiInfo.thumbnail}" alt="${wikiInfo.title}" style="max-width:100px; float:left; margin-right:10px;">` : ''}
+                <p>${wikiInfo.extract}</p>
+                <a href="${wikiInfo.pageUrl}" target="_blank">Mehr lesen</a>
+                <div style="clear: both;"></div>
+            `;
+        } else {
+            ortDiv.innerHTML += `<h3>Keine Wikipedia-Info für ${ortOhnePLZ} gefunden.</h3>`;
+        }
+
+        if (pois.length > 0) {
+            ortDiv.innerHTML += `<h4>Sehenswürdigkeiten in der Nähe von ${ortOhnePLZ}:</h4><ul style="margin-left: 1em; padding-left: 1em; list-style-type: disc;">`;
+            pois.forEach(poi => {
+                const name = poi.tags?.name || `POI ${poi.id}`;
+                ortDiv.innerHTML += `<li>${name}</li>`;
+            });
+            ortDiv.innerHTML += `</ul>`;
+        } else {
+            ortDiv.innerHTML += `<p>Keine Sehenswürdigkeiten in der Nähe gefunden.</p>`;
+        }
+
+        infoDivs.push(ortDiv);
+        infoContainer.appendChild(ortDiv);
+
+        const btn = document.createElement('button');
+        btn.textContent = ortOhnePLZ;
+        btn.classList.add('ort-button');
+        btn.addEventListener('click', () => {
+            zeigeInfoIndex(i);
+        });
+        btnGroup.appendChild(btn);
+    }
+
+    buttonContainer.appendChild(btnPrev);
+    buttonContainer.appendChild(btnNext);
+    infoContainer.insertBefore(buttonContainer, infoContainer.firstChild);
+    infoContainer.appendChild(btnGroup);
+
+    btnPrev.addEventListener('click', () => {
+        if (aktuelleInfoIndex > 0) {
+            zeigeInfoIndex(aktuelleInfoIndex - 1);
+        }
+    });
+    btnNext.addEventListener('click', () => {
+        if (aktuelleInfoIndex < infoDivs.length - 1) {
+            zeigeInfoIndex(aktuelleInfoIndex + 1);
+        }
+    });
+
+    if (infoDivs.length > 0) {
+        zeigeInfoIndex(0);
+    }
+
+    function zeigeInfoIndex(index) {
+        infoDivs.forEach((div, i) => {
+            div.style.display = i === index ? "block" : "none";
+        });
+        aktuelleInfoIndex = index;
+
+        btnPrev.disabled = index === 0;
+        btnNext.disabled = index === infoDivs.length - 1;
+    }
+}
+
+function aktualisiereStoppListe() {
+    const liste = document.getElementById("stopp-liste");
+    liste.innerHTML = "";
+
+    // Liste mit Drag & Drop Items füllen
+    orte.forEach((ort, index) => {
+        const li = document.createElement("li");
+        li.textContent = ort;
+        li.setAttribute("data-index", index);
+        li.style.padding = "5px 10px";
+        li.style.margin = "4px 0";
+        li.style.border = "1px solid #ccc";
+        li.style.borderRadius = "6px";
+        li.style.cursor = "grab";
+        liste.appendChild(li);
+    });
+
+    if (liste._sortable) {
+        liste._sortable.destroy();  
+    }
+
+    liste._sortable = Sortable.create(liste, {
+        animation: 150,
+        onEnd: function (evt) {
+            const altIndex = evt.oldIndex;
+            const neuIndex = evt.newIndex;
+
+            const ort = orte.splice(altIndex, 1)[0];
+            orte.splice(neuIndex, 0, ort);
+
+            const punkt = punkte.splice(altIndex, 1)[0];
+            punkte.splice(neuIndex, 0, punkt);
+
+            markerListe.forEach(m => karte.removeLayer(m));
+            markerListe = [];
+
+            punkte.forEach((latlng, i) => {
+                const marker = L.marker(latlng).addTo(karte).bindPopup(orte[i]);
+                markerListe.push(marker);
+            });
+
+            zeichneRoute();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    ladeUndZeigeRoute();
+});
+
+// Flugdaten sortieren (Hin- vor Rückflug)
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+let flugPreis = 0;
+let flugText = "";
+
+if (fluege.length >= 1) {
+  const hinflugSeg = fluege[0].itineraries[0].segments[0];
+  const hinflugPreis = parseFloat(fluege[0].price.grandTotal);
+  flugPreis += hinflugPreis;
+
+  flugText += `
+    🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
+    von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
+    <small>Preis Hinflug: ${hinflugPreis.toFixed(2)} EUR</small><br>
+  `;
+
+  if (fluege.length >= 2) {
+    const rueckflugSeg = fluege[1].itineraries[0].segments[0];
+    const rueckflugPreis = parseFloat(fluege[1].price.grandTotal);
+    flugPreis += rueckflugPreis;
+
+    flugText += `
+      🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
+      von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}<br>
+      <small>Preis Rückflug: ${rueckflugPreis.toFixed(2)} EUR</small><br>
+    `;
+  }
+}
+
+document.getElementById("flugInfo").innerHTML = flugText;
+
+// Hotelpreise berechnen
+let hotelPreis = 0;
+if (hotels && hotels.length > 0) {
+  hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
+}
+
+// Gesamtpreis berechnen
+const gesamt = flugPreis + hotelPreis;
+
+// Formatfunktion für Euro
+const formatPreis = (preis) =>
+  preis.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+  });
+
+// Einzelpreise anzeigen
+if (document.getElementById("preisInfo")) {
+  document.getElementById("preisInfo").innerText = `
+    ✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}
+  `;
+}
+
+// Gesamtpreis anzeigen
+document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Flug + Hotel): ${formatPreis(gesamt)}`;
+
+
+</script>
+{% endblock %}
+
