@@ -1,6 +1,25 @@
 # ITT Projekt
 
+# ✈️ Reiseplaner Webanwendung
 
+Dies ist eine Flask-basierte Webanwendung zum Erstellen und Verwalten von Reisen.  
+Daten werden in einer MongoDB Atlas Datenbank gespeichert.
+
+## ⚙️ Installation & Start
+
+1. **Projekt klonen**
+    ''bash
+    git clone <URL>
+    cd <Projektordner>
+2. **Virtuelle Umgebung aktivieren**
+    python - m venv .venv
+    .venv\Scripts\activate
+3. **Abhängigkeiten Installieren**
+    pip install -r requirements.txt
+4. **App starten**
+    flask run
+5. **Im Browser öffnen**
+    http://127.0.0.1:5000/
 
 ## Getting started
 
