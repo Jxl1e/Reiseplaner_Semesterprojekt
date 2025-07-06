@@ -1127,6 +1127,12 @@ input[type="radio"] {
   color: #333;
 }
 
+.disabled-link {
+    pointer-events: not-allowed;
+    color: gray;
+    cursor: default;
+  }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

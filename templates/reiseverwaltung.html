@@ -322,20 +322,20 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 }
 
-// Diese Funktion nach jeder Auswahl von "Reiseart" aufrufen
+
 document.querySelectorAll('input[name="reiseart"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const value = radio.value;
     document.getElementById('roadtrip-options').style.display = value === 'Roadtrip' ? 'block' : 'none';
     document.getElementById('badeurlaub-options').style.display = value === 'Badeurlaub' ? 'block' : 'none';
     document.getElementById('staedtetrip-options').style.display = value === 'Städtetrip' ? 'block' : 'none';
-    updateStoppsRequired(); // <== hier aufrufen
+    updateStoppsRequired();
   });
 });
 
-//Städtetrip
+
 const input = document.getElementById("sehenswuerdigkeit-input");
-const liste = document.getElementById("sehenswuerdigkeit-liste");  // Container für die Tags
+const liste = document.getElementById("sehenswuerdigkeit-liste"); 
 const hiddenInput = document.getElementById("sehenswuerdigkeiten-hidden");
 
 let sehenswuerdigkeiten = [];
