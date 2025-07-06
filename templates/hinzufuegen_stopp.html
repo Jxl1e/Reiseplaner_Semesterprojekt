@@ -167,7 +167,7 @@ let infoBox = document.getElementById("routen-info");
   }
 
   try {
-    zeigeLadeanimation(); // Start
+    zeigeLadeanimation(); 
 
     initialPunkte.length = 0;
     initialMarker.length = 0;
@@ -310,7 +310,6 @@ function aktualisiereStoppListe() {
     console.log("Liste gefunden:", liste);
     liste.innerHTML = "";
 
-    // Liste mit Drag & Drop Items füllen
     orte.forEach((ort, index) => {
         const li = document.createElement("li");
         li.innerHTML = `
@@ -342,19 +341,16 @@ function aktualisiereStoppListe() {
             const punkt = punkte.splice(altIndex, 1)[0];
             punkte.splice(neuIndex, 0, punkt);
 
-            // Alle Marker (inkl. Zielmarker) entfernen
             markerListe.forEach(m => karte.removeLayer(m));
             Object.values(markerMap).forEach(m => karte.removeLayer(m));
             markerListe = [];
             Object.keys(markerMap).forEach(k => delete markerMap[k]);
 
-            // Marker neu setzen
             punkte.forEach((latlng, i) => {
                 const ort = orte[i];
                 let marker;
 
                 if (i === orte.length - 1) {
-                    // Zielmarker
                     marker = L.marker(latlng, {
                         icon: L.icon({
                             iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
@@ -379,7 +375,7 @@ function aktualisiereStoppListe() {
 }
 
 async function addOrtAufKarte(ortName) {
-    if (orte.includes(ortName)) return; // doppelte Einträge vermeiden
+    if (orte.includes(ortName)) return; 
     orte.push(ortName);
 
     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ortName)}`);
@@ -390,7 +386,6 @@ async function addOrtAufKarte(ortName) {
 
         punkte.push([lat, lon]);
 
-        // Marker hinzufügen
         const marker = L.marker([lat, lon]).addTo(karte).bindPopup(ortName);
         markerListe.push(marker);
         markerMap[ortName] = marker;
@@ -427,20 +422,16 @@ function entferneStopp(name) {
         orte.splice(index, 1);
         punkte.splice(index, 1);
 
-        // Marker von der Karte entfernen
         const marker = markerMap[name];
         if (marker) {
             karte.removeLayer(marker);
             delete markerMap[name];
         }
 
-        // Liste aktualisieren (neu zeichnen)
         aktualisiereStoppListe();
 
-        // Route neu zeichnen
         zeichneRoute();
 
-        // Wenn der aktuell angezeigte Ort entfernt wird → Infofeld leeren
     const infoDiv = document.getElementById("stopp-info");
     const aktuellerTitel = infoDiv.querySelector("h3");
     if (aktuellerTitel && aktuellerTitel.textContent === name) {
@@ -454,7 +445,6 @@ function entferneStopp(name) {
 document.addEventListener('DOMContentLoaded', () => {
     ladeUndZeigeRoute();
 
-    // Zielland z.B. aus Template oder statisch
     const zielland = "{{ reise.zielland | default('DE') }}";
     initStopps(zielland);
 });
@@ -598,7 +588,6 @@ async function zeigeStoppInfos(name, lat, lon) {
   const infoDiv = document.getElementById("stopp-info");
   infoDiv.innerHTML = `<p><strong>${name}</strong> wird geladen...</p>`;
 
-// Entfernt Postleitzahl, falls vorhanden (z. B. "10115 Berlin" → "Berlin")
 function bereinigeOrtname(ort) {
   const teile = ort.trim().split(" ");
   if (teile.length > 1 && /^\d{4,5}$/.test(teile[0])) {
@@ -607,7 +596,6 @@ function bereinigeOrtname(ort) {
   return ort;
 }
 
-  // Wikipedia API: suche Beschreibung zu Stopp
   async function holeWikiBeschreibung(query) {
     try {
       const url = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&format=json&origin=*&titles=${encodeURIComponent(query)}`;
@@ -621,7 +609,6 @@ function bereinigeOrtname(ort) {
     }
   }
 
-  // Overpass API: Sehenswürdigkeiten in ~500m Radius
   async function holeSehenswuerdigkeiten(lat, lon) {
     const query = `
       [out:json][timeout:25];
@@ -650,12 +637,10 @@ function bereinigeOrtname(ort) {
     }
   }
 
-  // Infos holen
     const bereinigterName = bereinigeOrtname(name);
     const beschreibung = await holeWikiBeschreibung(bereinigterName);
     const sehenswuerdigkeiten = await holeSehenswuerdigkeiten(lat, lon);
 
-  // Ergebnis anzeigen
   let html = `<h3>${name}</h3>`;
   html += `<p>${beschreibung}</p>`;
 

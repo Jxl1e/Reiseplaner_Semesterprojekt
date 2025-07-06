@@ -74,11 +74,11 @@ body.legal main {
 body.legal main.container {
     background: white;
     padding: 2rem;
-    margin: 2rem auto;   /* horizontal zentrieren */
+    margin: 2rem auto; 
     border-radius: 6px;
     box-shadow: 0 0 12px rgba(0,0,0,0.1);
     max-width: 800px;
-    text-align: left;    /* Text linksbündig */
+    text-align: left; 
 }
 
 .flash_wrapper {
@@ -1099,12 +1099,12 @@ input[type="radio"] {
 }
 
 #lade-overlay {
-  position: fixed; /* oder "absolute" wenn du nur das Formular überlagern willst */
+  position: fixed; 
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.8); /* halbtransparentes Weiß */
+  background-color: rgba(255, 255, 255, 0.8); 
   display: none;
   z-index: 9999;
   justify-content: center;

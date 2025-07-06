@@ -198,7 +198,6 @@ document.getElementById('flug-form').addEventListener('submit', async function (
     `;
     container.appendChild(div);
 
-    // Hinflug hinzufügen
     div.querySelector(".hinzufuegen-btn").addEventListener("click", async () => {
       const res = await fetch("/api/flug_hinzufuegen", {
         method: "POST",
@@ -213,7 +212,6 @@ document.getElementById('flug-form').addEventListener('submit', async function (
       }
     });
 
-    // Rückflug suchen
     div.querySelector(".rueckflug-btn").addEventListener("click", async () => {
       const rueckDatum = prompt("Rückflug-Datum eingeben (YYYY-MM-DD):");
       if (!rueckDatum) return;
@@ -276,7 +274,6 @@ document.getElementById('flug-form').addEventListener('submit', async function (
   });
 });
 
-// Ortsname → IATA-Code
 async function getIataCode(ort) {
   const res = await fetch(`/api/get_iata_code?ort=${encodeURIComponent(ort)}`);
   const data = await res.json();

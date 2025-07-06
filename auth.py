@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import UserMixin, login_user, logout_user, current_user, login_required
 from bson.objectid import ObjectId
-from app import db, reisen, bcrypt, login_manager
+from app import db, bcrypt, login_manager
 
 auth_bp = Blueprint("auth", __name__)
 

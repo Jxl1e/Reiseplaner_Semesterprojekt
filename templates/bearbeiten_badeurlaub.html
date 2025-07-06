@@ -107,11 +107,9 @@
     
 function entferneFlug(index) {
   fluege.splice(index, 1);
-  zeigeFluege(); // neu rendern
+  zeigeFluege(); 
 }
 
-            
-// Flugdaten sortieren (Hin- vor Rückflug)
 fluege.sort((a, b) => {
   const aDate = new Date(a.itineraries[0].segments[0].departure.at);
   const bDate = new Date(b.itineraries[0].segments[0].departure.at);

@@ -132,11 +132,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const zielland = "{{ zielland }}";
-
-  // ========== ZIELORT AUTOCOMPLETE ==========
   setupAutocomplete('zielort', 'autocomplete-list', '/autocomplete_ort', zielland);
 
-  // ========== ZWISCHENSTOPPS ==========
   const eingabe = document.getElementById('zwischenstopp-input');
   const stoppsList = document.getElementById('autocomplete-stopps-list');
   const stoppTags = document.getElementById('zwischenstopps-liste');
@@ -377,7 +374,6 @@ function aktualisiereSehenswuerdigkeitenTags() {
     liste.appendChild(tag);
   });
 
-  // Setze hidden Input mit JSON-Array
   hiddenInput.value = JSON.stringify(sehenswuerdigkeiten);
 }
 
@@ -387,7 +383,7 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const overlay = document.getElementById('lade-overlay');
-  overlay.style.display = 'flex'; // Lade-Overlay einblenden
+  overlay.style.display = 'flex';
 
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
@@ -396,7 +392,6 @@ form.addEventListener('submit', async (e) => {
   const formData = new FormData(form);
   const reiseart = formData.get('reiseart');
 
-  // Optional: dynamische Daten ergänzen
   if (reiseart === 'Roadtrip') {
     const stoppsOption = formData.get('stopps_option');
     if (stoppsOption === 'manuell') {
@@ -424,7 +419,7 @@ form.addEventListener('submit', async (e) => {
     zeigeToastError(err.message || "Unbekannter Fehler");
     submitButton.disabled = false;
     submitButton.innerHTML = '<span>🔍</span>';
-    overlay.style.display = 'none'; // Lade-Overlay ausblenden
+    overlay.style.display = 'none'; 
   }
 });
 

@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager
 from pymongo import MongoClient

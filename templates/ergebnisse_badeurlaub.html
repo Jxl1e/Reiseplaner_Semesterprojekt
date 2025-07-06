@@ -5,7 +5,7 @@
 {% block body %}
     <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reisedaten.zielland_name }}</h1>
     
-<h6>Reisezeitraum:</h6>
+<h2>Reisezeitraum:</h2>
  <p>Anreise: {{ reisedaten.anreise }} <br>
 Abreise: {{ reisedaten.abreise }}</p>
 
@@ -27,10 +27,8 @@ Abreise: {{ reisedaten.abreise }}</p>
 
   <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
 
-    <!-- Animationspfad (Flugbahn) -->
     <path id="flugbahn" d="M30,110 C70,70 140,40 200,40 S330,70 370,110" stroke="#0077b6" stroke-width="2" fill="none" />
 
-    <!-- Flugzeug-Grafik aus deinem Code -->
     <g id="flugzeug" transform="scale(0.08, -0.08)">
       <g transform="translate(-950,-950)" fill="black" stroke="none">
         <path d="M501 1243 c15 -39 27 -52 92 -94 60 -39 101 -81 90 -93 -3 -3 2 -6
@@ -175,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
              🛫 ${departure}<br>
              🛬 ${arrival}<br>
              💶 Preis: <strong>${price} €</strong></p>
-          <button data-index="${idx}" class="entfernen-btn">Flug entfernen</button>
+          <button data-index="${idx}" class="entfernen-button">Flug entfernen</button>
         `;
         ausgewaehlteFluegeListe.appendChild(div);
 

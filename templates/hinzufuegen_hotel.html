@@ -114,7 +114,7 @@
         return;
       }
 
-const markers = []; // neue Liste für alle Marker
+const markers = []; 
 
 data.results
   .filter(place => place.geometry && place.geometry.location)
@@ -146,7 +146,6 @@ data.results
     selectedHotel = place;
     document.getElementById('addHotelBtn').disabled = false;
 
-    // optisch markieren
     document.querySelectorAll('.hotel-card').forEach(c => c.classList.remove('selected'));
     div.classList.add('selected');
 
@@ -159,7 +158,6 @@ data.results
 
   resultsDiv.appendChild(div);
 
-  // Marker für alle Ergebnisse hinzufügen
   const resultMarker = L.marker([
     place.geometry.location.lat,
     place.geometry.location.lng
@@ -170,7 +168,6 @@ data.results
   markers.push(resultMarker);
 });
 
-// Alte Marker entfernen
 markers.forEach(m => map.removeLayer(m));
 markers.length = 0;
     });
@@ -184,7 +181,6 @@ markers.length = 0;
         lat: selectedHotel.geometry.location.lat,
         lon: selectedHotel.geometry.location.lng,
         place_id: selectedHotel.place_id,
-        // Optional: weitere Daten hinzufügen
       };
 
       const res = await fetch(`/reisen/${reiseId}/hotels`, {

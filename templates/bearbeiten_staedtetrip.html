@@ -295,8 +295,7 @@ async function zeichneRoute() {
       retryBtn.addEventListener("click", async () => {
         retryBtn.disabled = true;
         infoBox.textContent = "Bitte warten...";
-        await zeichneRoute();  // Funktion erneut ausführen
-        // Nach Erfolg oder Fehler wieder aktivieren (je nach Logik)
+        await zeichneRoute();  
         retryBtn.disabled = false;
       });
     }
@@ -391,7 +390,6 @@ function aktualisiereStoppListe() {
             const alt = evt.oldIndex;
             const neu = evt.newIndex;
 
-            // Arrays synchronisieren
             const ort = sehenswuerdigkeiten.splice(alt, 1)[0];
             sehenswuerdigkeiten.splice(neu, 0, ort);
 
@@ -432,7 +430,6 @@ async function speichereStoppreihenfolge() {
 }
 document.getElementById('speichere-sehenswuerdigkeiten').addEventListener('click', async () => {
     try {
-        // Speichere nur die Stoppreihenfolge
         const response = await fetch(`/reise/${reiseId}/sehenswuerdigkeiten`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -514,14 +511,12 @@ const formatDate = (iso) =>
     year: "numeric",
   });
 
-// Flüge nach Datum sortieren
 fluege.sort((a, b) => {
   const aDate = new Date(a.itineraries[0].segments[0].departure.at);
   const bDate = new Date(b.itineraries[0].segments[0].departure.at);
   return aDate - bDate;
 });
 
-// HTML-Inhalt leeren und Flüge rendern
 const flugInfoDiv = document.getElementById("flugInfo");
 if(flugInfoDiv) {
   flugInfoDiv.innerHTML = "";

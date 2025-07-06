@@ -281,8 +281,7 @@ async function zeichneRoute() {
       retryBtn.addEventListener("click", async () => {
         retryBtn.disabled = true;
         infoBox.textContent = "Bitte warten...";
-        await zeichneRoute();  // Funktion erneut ausführen
-        // Nach Erfolg oder Fehler wieder aktivieren (je nach Logik)
+        await zeichneRoute(); 
         retryBtn.disabled = false;
       });
     }
@@ -338,7 +337,6 @@ function aktualisiereStoppListe() {
             const alt = evt.oldIndex;
             const neu = evt.newIndex;
 
-            // Arrays synchronisieren
             const ort = sehenswuerdigkeiten.splice(alt, 1)[0];
             sehenswuerdigkeiten.splice(neu, 0, ort);
 

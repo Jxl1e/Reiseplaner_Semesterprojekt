@@ -504,30 +504,25 @@ if (flugBox) {
   flugBox.innerHTML = flugText;
 }
 
-// Hotelpreise berechnen
 let hotelPreis = 0;
 if (hotels && hotels.length > 0) {
   hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
 }
 
-// Gesamtpreis berechnen
 const gesamt = flugPreis + hotelPreis;
 
-// Formatfunktion für Euro
 const formatPreis = (preis) =>
   preis.toLocaleString("de-DE", {
     style: "currency",
     currency: "EUR",
   });
 
-// Einzelpreise anzeigen
 if (document.getElementById("preisInfo")) {
   document.getElementById("preisInfo").innerText = `
     ✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}
   `;
 }
 
-// Gesamtpreis anzeigen
 document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Hotel + Flug): ${formatPreis(gesamt)}`;
 
 function zeigeToast(message, dauer = 3000) {

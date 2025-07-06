@@ -1,5 +1,3 @@
-import re
-from difflib import get_close_matches
 import requests
 from rapidfuzz import process
 import os

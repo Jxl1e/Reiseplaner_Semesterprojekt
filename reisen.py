@@ -6,7 +6,7 @@ import requests
 import json
 from app import db, reisen
 from utils import fuzzy_korrektur, finde_ort_ueber_geonames, finde_ort_ueber_nominatim, validiere_und_normalisiere_stopp
-from api import suche_fluege, hole_token, get_iata_code, get_iata
+from api import hole_token, get_iata
 
 reisen_bp = Blueprint("reisen", __name__, url_prefix="")
 

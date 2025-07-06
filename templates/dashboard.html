@@ -273,7 +273,6 @@
 <script>
   const reisen = {{ reisen | tojson | safe }};
 
-  // 1. Klickbare Karten mit Daten-URLs
   document.querySelectorAll('.card').forEach((card, index) => {
     const url = card.getAttribute('data-url');
     if (url) {
@@ -294,21 +293,17 @@
       });
     }
 
-    // 2. Reise zu dieser Karte holen (gleicher Index wie Karte)
     const reise = reisen[index];
-    if (!reise) return; // Sicherheit, falls mismatch
+    if (!reise) return;
 
-    // 3. Flüge und Hotels aus der Reise holen
     const fluege = reise.fluege || [];
     const hotels = reise.hotels || [];
 
-    // 4. Flug-Infos im Karte anzeigen (hier nehmen wir an, es gibt ein div mit Klasse 'flugInfo' in der Karte)
     const flugInfoEl = card.querySelector('#flugInfo');
     if (flugInfoEl) {
       if (fluege.length === 0) {
         flugInfoEl.innerHTML = '✈️ Keine Flugdaten verfügbar.';
       } else {
-        // Flüge sortieren (Hinflug vor Rückflug)
         fluege.sort((a, b) => {
           const aDate = new Date(a.itineraries[0].segments[0].departure.at);
           const bDate = new Date(b.itineraries[0].segments[0].departure.at);
@@ -353,7 +348,6 @@
       }
     }
 
-    // 5. Hotelpreise berechnen und anzeigen (div mit id preisInfo in der Karte)
     const preisInfoEl = card.querySelector('#preisInfo');
     if (preisInfoEl) {
       let hotelPreis = 0;

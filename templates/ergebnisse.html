@@ -4,7 +4,7 @@
 
 {% block body %}
 <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} in {{ reisedaten.zielland_name }}</h1>
-<h5>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h5>
+<h3>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h3>
 
 <div class="hauptbereich">
     <div class="oben_e">
@@ -171,7 +171,6 @@
   document.getElementById('lade-box').style.display = "none";
 
 
-    // Reverse Geocoding (Nominatim)
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
     const data = await res.json();
     let ortName = data.address.city || data.address.town || data.address.village || data.display_name || "Neuer Stopp";
@@ -213,7 +212,6 @@ stoppInput.addEventListener("input", async () => {
   const response = await fetch(`/autocomplete_ort?q=${encodeURIComponent(query)}&country=${country}`);
   const data = await response.json();
 
-  // Liste anzeigen
   autocompleteList.innerHTML = "";
   data.results.forEach(item => {
     const li = document.createElement("li");
@@ -222,7 +220,6 @@ stoppInput.addEventListener("input", async () => {
     li.addEventListener("click", () => {
       stoppInput.value = item;
       autocompleteList.innerHTML = "";
-      // Marker setzen:
       neuenStoppHinzufuegen(item);
     });
     autocompleteList.appendChild(li);
@@ -597,7 +594,6 @@ function aktualisiereStoppListe() {
         liste.appendChild(li);
     });
 
-    // Sortable initialisieren oder neu initialisieren
     if (liste._sortable) {
         liste._sortable.destroy();
     }
@@ -623,7 +619,7 @@ function aktualisiereStoppListe() {
             });
 
             ladeUndZeigeRoute();
-            aktualisiereStoppListe(); // Liste neu rendern, da Reihenfolge geändert
+            aktualisiereStoppListe();
         }
     });
 }

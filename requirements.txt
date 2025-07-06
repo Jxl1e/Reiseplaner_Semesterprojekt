@@ -1,6 +1,8 @@
-flask
 Flask
 pymongo
 dnspython
-flask-bcrypt
-flask-login
+Flask-Bcrypt
+Flask-Login
+Flask-Assets
+requests
+rapidfuzz

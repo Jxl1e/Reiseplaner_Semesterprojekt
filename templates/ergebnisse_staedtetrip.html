@@ -4,7 +4,7 @@
 
 {% block body %}
 <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reisedaten.zielort }}</h1>
-<h5>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h5>
+<h3>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h3>
 
 <div style="display:flex; gap: 20px; height: 80vh;">
   <!-- Linke Seite: Karte -->
@@ -164,10 +164,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
  await ladeUndZeigeRoute();
 
-    // Event für Hinzufügen Stopps
     document.getElementById("btnStoppHinzufuegen").addEventListener("click", neuenStoppHinzufuegen);
 
-    // Umschalter Fuß/ÖPNV
     document.getElementById("modusSelect").addEventListener("change", async (e) => {
         aktuellerModus = e.target.value;
         zeichneRoute();
@@ -398,7 +396,6 @@ function aktualisiereStoppListe() {
             const alt = evt.oldIndex;
             const neu = evt.newIndex;
 
-            // Arrays synchronisieren
             const ort = sehenswuerdigkeiten.splice(alt, 1)[0];
             sehenswuerdigkeiten.splice(neu, 0, ort);
 

@@ -4,7 +4,7 @@
 
 {% block body %}
 <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland_name }}</h2>
-<h5>von {{ reise.anreise or "?" }} bis {{ reise.abreise or "?" }}</h5>
+<h3>von {{ reise.anreise or "?" }} bis {{ reise.abreise or "?" }}</h3>
 
 <div class="oben_e">
    <div style="display: flex; height: 80vh; width: 100vw;">
@@ -593,30 +593,25 @@ if (flugBox) {
   flugBox.innerHTML = flugText;
 }
 
-// Hotelpreise berechnen
 let hotelPreis = 0;
 if (hotels && hotels.length > 0) {
   hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
 }
 
-// Gesamtpreis berechnen
 const gesamt = flugPreis + hotelPreis;
 
-// Formatfunktion für Euro
 const formatPreis = (preis) =>
   preis.toLocaleString("de-DE", {
     style: "currency",
     currency: "EUR",
   });
 
-// Einzelpreise anzeigen
 if (document.getElementById("preisInfo")) {
   document.getElementById("preisInfo").innerText = `
     ✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}
   `;
 }
 
-// Gesamtpreis anzeigen
 document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Flug + Hotel): ${formatPreis(gesamt)}`;
 
 function zeigeToast(message, dauer = 3000) {

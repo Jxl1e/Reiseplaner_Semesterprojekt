@@ -580,10 +580,8 @@ function entferneFlug(index) {
 }
 
 function entferneHotel(hotelId) {
-  // Filtere das Hotel raus aus dem Array hotels
   hotels = hotels.filter(hotel => (hotel.id ?? hotel._id) !== hotelId);
 
-  // Liste neu rendern
   aktualisiereHotelListe();
 
   zeigeToast("Hotel lokal entfernt. Bitte speichern, um Änderungen zu übernehmen.");
@@ -603,12 +601,10 @@ function aktualisiereHotelListe() {
   hotels.forEach(hotel => {
     const hotelId = hotel.id ?? hotel._id;
 
-    // Neues <li>
     const li = document.createElement('li');
     li.classList.add('hotel-item');
     li.setAttribute('data-hotel-id', hotelId);
 
-    // Container für Hotelname + Button
     const row = document.createElement('div');
     row.classList.add('hotel-row');
 
@@ -624,23 +620,15 @@ function aktualisiereHotelListe() {
     row.appendChild(nameSpan);
     row.appendChild(removeBtn);
 
-    // Adresse
     const addr = document.createElement('div');
     addr.classList.add('hotel-address');
     addr.textContent = hotel.address ?? '';
 
-    // Alles zusammenfügen
     li.appendChild(row);
     li.appendChild(addr);
     hotelListElement.appendChild(li);
   });
 }
-
-
-
-
-
-
 
 </script>
 {% endblock %}
