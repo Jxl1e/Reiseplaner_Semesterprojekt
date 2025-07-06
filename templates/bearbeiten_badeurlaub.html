@@ -26,21 +26,25 @@
             {% if reise.fluege and reise.fluege | length >= 1 %}
             <div>
                 <h4><strong>✈️ Flugdetails</strong></h4>
-                <p id="flugInfo">Lade Fluginformationen...</p>
+                <p id="flugInfo" style="width: 400px;">Lade Fluginformationen...</p>
             </div>
             {% else %}
                 <p>✈️ Keine Flugdaten verfügbar.</p>
             {% endif %}
 
-            {% if reise.hotels and reise.hotels | length > 0 %}
+              {% if reise.hotels and reise.hotels | length > 0 %}
             <div>
                 <h4><strong>🏨 Hotels</strong></h4>
-                <ul>
+                <ul id="hotel-list">
                 {% for hotel in reise.hotels %}
-                    <li>
-                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
-                    <br>
-                    <small>{{ hotel.address }}</small>
+                    <li class="hotel-item" data-hotel-id="{{ hotel.id or hotel._id }}">
+                    <div class="hotel-top">
+                        <span class="hotel-name">
+                        <strong>{{ hotel.name }}</strong>
+                        <button class="entfernen-button" onclick="entferneHotel('{{ hotel.id or hotel._id }}')">✖</button>
+                        </span>
+                    </div>
+                    <div class="hotel-address">{{ hotel.address }}</div>
                     </li>
                 {% endfor %}
                 </ul>
@@ -105,56 +109,6 @@
     const hotels = {{ reise.hotels | default([]) | tojson | safe }};
 
     
-function entferneFlug(index) {
-  fluege.splice(index, 1);
-  zeigeFluege(); 
-}
-
-fluege.sort((a, b) => {
-  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
-  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
-  return aDate - bDate;
-});
-
-const formatDate = (iso) =>
-  new Date(iso).toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-
-let flugPreis = 0;
-let flugText = "";
-
-
-
-function zeigeFluege() {
-    let flugText = "";
-    let flugPreis = 0;
-
-    fluege.forEach((flug, index) => {
-        const seg = flug.itineraries[0].segments[0];
-        const preis = parseFloat(flug.price.grandTotal);
-        flugPreis += preis;
-
-        flugText += `
-            🛫 <strong>${index === 0 ? "Hinflug" : "Rückflug"}:</strong> ${formatDate(seg.departure.at)}
-            von ${seg.departure.iataCode} nach ${seg.arrival.iataCode}<br>
-            <small>Preis: ${preis.toFixed(2)} EUR</small>
-            <button class="entfernen-button" onclick="entferneFlug(${index})">🗑️</button>
-            <hr>
-        `;
-    });
-
-    const flugBox = document.getElementById("flugInfo");
-    if (flugBox) {
-    flugBox.innerHTML = flugText;
-    }
-    }
-
-
-
 document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventListener('click', async (e) => {
     e.preventDefault();
 
@@ -166,9 +120,10 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                fluege: fluege,
                 anreise: anreise,
-                abreise: abreise
+                abreise: abreise,
+                fluege: fluege, 
+                hotels: hotels
             })
         });
 
@@ -177,13 +132,114 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
         const result = await response.json();
         zeigeToast("Reise erfolgreich gespeichert!");
         setTimeout(() => {
-  window.location.href = `/anzeigen_badeurlaub/${reiseId}`;
-}, 1500);
+            window.location.href = `/anzeigen_badeurlaub/${reiseId}`;
+        }, 1500);
     } catch (err) {
         console.error(err);
         zeigeToastError("Fehler beim Speichern der Reise.");
     }
 });
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+function renderFluege() {
+  const flugInfoDiv = document.getElementById("flugInfo");
+  if (flugInfoDiv) {
+    flugInfoDiv.innerHTML = "";
+
+    fluege.sort((a, b) => {
+      const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+      const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+      return aDate - bDate;
+    });
+
+    fluege.forEach((flug, index) => {
+      const segment = flug.itineraries[0].segments[0];
+
+      const flugDiv = document.createElement("div");
+      flugDiv.id = `flug-${index}`;
+      flugDiv.style.display = "flex";
+      flugDiv.style.alignItems = "center";
+      flugDiv.style.marginBottom = "5px";
+      flugDiv.innerHTML = `
+        <span style="flex: 1;">
+          🛫 <strong>Flug:</strong> ${formatDate(segment.departure.at)}
+          von ${segment.departure.iataCode} nach ${segment.arrival.iataCode}
+        </span>
+        <button class="entfernen-button" onclick="entferneFlug(${index})">✖</button>
+      `;
+
+      flugInfoDiv.appendChild(flugDiv);
+    });
+  }
+}
+
+function entferneFlug(index) {
+  fluege.splice(index, 1);
+  renderFluege();
+  zeigeToast("Flug entfernt");
+}
+
+// Initial render
+renderFluege();
+
+function entferneHotel(hotelId) {
+  hotels = hotels.filter(hotel => (hotel.id ?? hotel._id) !== hotelId);
+
+  const li = document.querySelector(`li[data-hotel-id="${hotelId}"]`);
+  if (li) li.remove();
+
+  zeigeToast("Hotel lokal entfernt. Bitte speichern, um Änderungen zu übernehmen.");
+}
+
+function aktualisiereHotelListe() {
+  const hotelListElement = document.getElementById('hotel-list');
+  if (!hotelListElement) return;
+
+  hotelListElement.innerHTML = '';
+
+  if (hotels.length === 0) {
+    hotelListElement.innerHTML = '<p>🏨 Keine Hotelinformationen verfügbar.</p>';
+    return;
+  }
+
+  hotels.forEach(hotel => {
+    const hotelId = hotel.id ?? hotel._id;
+
+    const li = document.createElement('li');
+    li.classList.add('hotel-item');
+    li.setAttribute('data-hotel-id', hotelId);
+
+    const row = document.createElement('div');
+    row.classList.add('hotel-row');
+
+    const nameSpan = document.createElement('span');
+    nameSpan.innerHTML = `<strong>${hotel.name}</strong> – ${hotel.price ?? ''} ${hotel.currency ?? ''}`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'entfernen-button';
+    removeBtn.title = 'Hotel entfernen';
+    removeBtn.textContent = '✖';
+    removeBtn.addEventListener('click', () => entferneHotel(hotelId));
+
+    row.appendChild(nameSpan);
+    row.appendChild(removeBtn);
+
+    const addr = document.createElement('div');
+    addr.classList.add('hotel-address');
+    addr.textContent = hotel.address ?? '';
+
+    li.appendChild(row);
+    li.appendChild(addr);
+    hotelListElement.appendChild(li);
+  });
+}
 
 function zeigeToast(message, dauer = 3000) {
     const toast = document.getElementById('toast');
@@ -196,7 +252,6 @@ function zeigeToast(message, dauer = 3000) {
         toast.style.visibility = 'hidden';
     }, dauer);
 }
-zeigeFluege();
 
 function zeigeToastError(message, dauer = 3000) {
     const toast = document.getElementById('toast-error');

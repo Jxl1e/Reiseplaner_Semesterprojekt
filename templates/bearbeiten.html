@@ -514,7 +514,8 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
                 stopps: orte,
                 anreise: anreise,
                 abreise: abreise,
-                hotels: hotels 
+                fluege: fluege, 
+                hotels: hotels
             })
         });
 
@@ -523,8 +524,8 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
         const result = await response.json();
         zeigeToast("Reise erfolgreich gespeichert!");
         setTimeout(() => {
-  window.location.href = `/anzeigen/${reiseId}`;
-}, 1500);
+            window.location.href = `/anzeigen/${reiseId}`;
+        }, 1500);
     } catch (err) {
         console.error(err);
         zeigeToastError("Fehler beim Speichern der Reise.");
@@ -539,50 +540,52 @@ const formatDate = (iso) =>
     year: "numeric",
   });
 
-// Flüge nach Datum sortieren
-fluege.sort((a, b) => {
-  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
-  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
-  return aDate - bDate;
-});
+function renderFluege() {
+  const flugInfoDiv = document.getElementById("flugInfo");
+  if (flugInfoDiv) {
+    flugInfoDiv.innerHTML = "";
 
-// HTML-Inhalt leeren und Flüge rendern
-const flugInfoDiv = document.getElementById("flugInfo");
-if(flugInfoDiv) {
-  flugInfoDiv.innerHTML = "";
+    fluege.sort((a, b) => {
+      const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+      const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+      return aDate - bDate;
+    });
+
+    fluege.forEach((flug, index) => {
+      const segment = flug.itineraries[0].segments[0];
+
+      const flugDiv = document.createElement("div");
+      flugDiv.id = `flug-${index}`;
+      flugDiv.style.display = "flex";
+      flugDiv.style.alignItems = "center";
+      flugDiv.style.marginBottom = "5px";
+      flugDiv.innerHTML = `
+        <span style="flex: 1;">
+          🛫 <strong>Flug:</strong> ${formatDate(segment.departure.at)}
+          von ${segment.departure.iataCode} nach ${segment.arrival.iataCode}
+        </span>
+        <button class="entfernen-button" onclick="entferneFlug(${index})">✖</button>
+      `;
+
+      flugInfoDiv.appendChild(flugDiv);
+    });
+  }
 }
-
-fluege.forEach((flug, index) => {
-  const segment = flug.itineraries[0].segments[0];
-
-  const flugDiv = document.createElement("div");
-    flugDiv.id = `flug-${index}`;
-    flugDiv.style.display = "flex";
-    flugDiv.style.alignItems = "center";
-    flugDiv.style.marginBottom = "5px"; 
-    flugDiv.innerHTML = `
-    <span style="flex: 1;">
-        🛫 <strong>Flug:</strong> ${formatDate(segment.departure.at)}
-        von ${segment.departure.iataCode} nach ${segment.arrival.iataCode}
-    </span>
-    <button class="entfernen-button" onclick="entferneFlug(${index})">✖</button>
-    `;
-
-  flugInfoDiv.appendChild(flugDiv);
-});
 
 function entferneFlug(index) {
   fluege.splice(index, 1);
-  const flugElement = document.getElementById(`flug-${index}`);
-  if (flugElement) {
-    flugElement.remove();
-  }
+  renderFluege();
+  zeigeToast("Flug entfernt");
 }
+
+// Initial render
+renderFluege();
 
 function entferneHotel(hotelId) {
   hotels = hotels.filter(hotel => (hotel.id ?? hotel._id) !== hotelId);
 
-  aktualisiereHotelListe();
+  const li = document.querySelector(`li[data-hotel-id="${hotelId}"]`);
+  if (li) li.remove();
 
   zeigeToast("Hotel lokal entfernt. Bitte speichern, um Änderungen zu übernehmen.");
 }
@@ -629,6 +632,7 @@ function aktualisiereHotelListe() {
     hotelListElement.appendChild(li);
   });
 }
+
 
 </script>
 {% endblock %}
