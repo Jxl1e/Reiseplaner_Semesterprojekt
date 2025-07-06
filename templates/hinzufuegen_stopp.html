@@ -13,18 +13,20 @@
      <div class="stopp-eingabe">
         <div>
             <label for="stopp">Stopp eingeben (PLZ oder Ort):</label>
+            <div style="display: flex;">
             <div class="hinzufuegen-stopp">
             <div class="autocomplete-wrapper" style="position: relative;">
-                <input type="text" id="stopp" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required style="width: 14vw;">
+                <input type="text" id="stopp" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required>
                 <ul id="autocomplete-list" class="autocomplete-list"></ul>
             </div>
             <div id="stopp-tags"></div>
                 <input type="hidden" id="stopp-hidden" name="stopps">
             </div>
         
-            <button class="button-l" type="submit">
+            <button class="button-l" type="submit" style="margin-left: 8px;">
                 <span>🔍</span>
             </button>
+            </div>
         </div>
     </div>
     <div id="stopp-info" style="border:1px solid #ccc; padding:10px; border-radius:8px; margin: 10px 0; max-height: 700px; overflow-y: auto;">
@@ -39,13 +41,38 @@
     </div>
 </div>
 
+<div id="lade-box" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="car-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
+</div>
+
 
 <div class="stopps-buttons">
     <div class="abbrechen">
-            <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.edit', reise_id=reise._id)}}"><span>Zurück</span></a>
+      <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.edit', reise_id=reise._id)}}"><span>Zurück</span></a>
     </div>
     <button id="speichere-stopps" type="button" class="button"><span>Hinzufügen</span></button>
 </div>
+
+<div class="space"></div>
 
 <div id="toast" style="
     visibility: hidden;
@@ -108,45 +135,119 @@
         attribution: '© OpenStreetMap'
     }).addTo(karte);
 
-    async function ladeUndZeigeRoute() {
-     for (let i = 0; i < orte.length; i++) {
-    const ort = orte[i];
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
-    const daten = await res.json();
-    if (daten.length > 0) {
+   carAnimation = lottie.loadAnimation({
+          container: document.getElementById('car-animation'),
+          renderer: 'svg',
+          loop: true,
+          autoplay: true,
+          path: '/static/animations/car-animation.json'
+        });
+
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "flex";
+  carAnimation.play();
+}
+
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "none";
+  carAnimation.pause();
+}
+
+  async function ladeUndZeigeRoute() {
+let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation(); // Start
+
+    initialPunkte.length = 0;
+    initialMarker.length = 0;
+
+    for (let i = 0; i < orte.length; i++) {
+      const ort = orte[i];
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+      
+      if (!res.ok) throw new Error("Fehler bei Geodaten-Antwort");
+
+      const daten = await res.json();
+
+      if (daten.length > 0) {
         let lat = parseFloat(daten[0].lat);
         let lon = parseFloat(daten[0].lon);
 
         let marker;
         if (i === orte.length - 1) {
-            marker = L.marker([lat, lon], {
-                icon: L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 30],
-                    popupAnchor: [0, -30]
-                })
-            }).addTo(karte).bindPopup(ort + " (Ziel)");
+          marker = L.marker([lat, lon], {
+            icon: L.icon({
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+              iconSize: [30, 30],
+              iconAnchor: [15, 30],
+              popupAnchor: [0, -30]
+            })
+          }).addTo(karte).bindPopup(ort + " (Ziel)");
         } else {
-            marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
+          marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
         }
 
         initialMarker.push(marker);
-        markerMap[ort] = marker;
         initialPunkte.push([lat, lon]);
+      }
     }
+
+    punkte = [...initialPunkte];
+    markerListe = [...initialMarker];
+
+    await zeichneRoute();
+    aktualisiereStoppListe();
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await zeichneRoute(); 
+          retryBtn.disabled = false;
+        });
+  } finally {
+    versteckeLadeanimation();
+    
+  }
 }
-        punkte = [...initialPunkte];
-        markerListe = [...initialMarker];
-        zeichneRoute();
 
 
-        aktualisiereStoppListe();
-    }
 
-   async function zeichneRoute() {
-    if (punkte.length <= 1) return;
+async function zeichneRoute() {
 
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+  
+  if (punkte.length <= 1) {
+    return;
+  }
+
+
+  setTimeout(async () => {
     if (routeLinie) karte.removeLayer(routeLinie);
 
     const body = {
@@ -154,38 +255,53 @@
         format: "geojson"
     };
 
-    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-        method: 'POST',
-        headers: {
-            'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
+    try {
+        const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+            method: 'POST',
+            headers: {
+                'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
 
-    const data = await res.json();
-
-    routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
-    karte.fitBounds(routeLinie.getBounds());
-
-    const summary = data.features?.[0]?.properties?.summary;
-    if (summary) {
-        const distKm = (summary.distance / 1000).toFixed(1);
-        const dauerMin = Math.round(summary.duration / 60);
-        const std = Math.floor(dauerMin / 60);
-        const min = dauerMin % 60;
-
-        const infoZ = document.querySelector(".info-z");
-        const infoE = document.querySelector(".info-e");
-
-        if (infoZ) {
-            infoZ.textContent = `Reisezeit: ${std}h ${min}min`;
+        if (!res.ok) {
+            throw new Error(`Routing fehlgeschlagen (Status ${res.status})`);
         }
 
-        if (infoE) {
-            infoE.textContent = `Entfernung: ${distKm} km`;
+        const data = await res.json();
+
+        routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+        const summary = data.features?.[0]?.properties?.summary;
+        if (summary) {
+            const distKm = (summary.distance / 1000).toFixed(1);
+            const dauerMin = Math.round(summary.duration / 60);
+            const std = Math.floor(dauerMin / 60);
+            const min = dauerMin % 60;
+
+            infoBox.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
         }
+
+    } catch (err) {
+        console.error(err);
+
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+        infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await zeichneRoute(); 
+          retryBtn.disabled = false;
+        });
+        throw err;
     }
+  }, 50);
 }
 
 
@@ -350,7 +466,6 @@ function initStopps(zielland) {
     const hiddenField = document.getElementById('stopp-hidden');
     const stopps = [];
 
-    // Bereits gesetzte Stopps aus hidden field laden
     if (hiddenField.value.trim()) {
         hiddenField.value.split(',').forEach(stop => {
             const trimmed = stop.trim();
@@ -369,8 +484,8 @@ function initStopps(zielland) {
     list.style.display = 'none';
     hiddenField.value = stopps.join(',');
 
-    // 🔽 NEU: Ort auf Karte + Route hinzufügen
-    addOrtAufKarte(name);   
+    addOrtAufKarte(name);  
+    zeigeStoppInfos(name); 
     }
 
 
@@ -378,7 +493,6 @@ function initStopps(zielland) {
         const index = stopps.findIndex(s => s === name);
         if (index !== -1) {
             stopps.splice(index, 1);
-            updateTagUI();
             hiddenField.value = stopps.join(',');
         }
     }

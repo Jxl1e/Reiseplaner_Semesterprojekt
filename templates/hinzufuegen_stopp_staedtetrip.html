@@ -12,7 +12,7 @@
     <div style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; min-width: 0;">
       <div class="stopp-eingabe" style="margin-top: 20px;">
         <div style="display: flex; gap: 10px;">
-          <input type="text" id="neuerStopp" placeholder="Stopp hinzufügen..." style="flex:1; width: 15vw;" />
+          <input type="text" id="neuerStopp" placeholder="Stopp hinzufügen..." />
           <button id="btnStoppHinzufuegen" class="button-l"><span>🔍</span></button>
         </div>
       </div>
@@ -29,12 +29,37 @@
   </div>
 </div>
 
+<div id="lade-box-staedtetrip" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="lauf-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
+</div>
+
 <div class="stopps-buttons">
   <div class="abbrechen">
     <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.edit_staedtetrip', reise_id=reise._id) }}"><span>Zurück</span></a>
   </div>
   <button id="speichere-stopps" type="button" class="button"><span>Hinzufügen</span></button>
 </div>
+
+<div class="space"></div>
 
 <div id="toast" style="
   visibility: hidden;
@@ -92,22 +117,18 @@
       attribution: "© OpenStreetMap-Mitwirkende"
     }).addTo(karte);
 
-    const zielKoord = await geocodeOrt(zielort);
-    if (zielKoord) {
-      karte.setView(zielKoord, 13);
-    }
+        laufAnimation = lottie.loadAnimation({
+      container: document.getElementById('lauf-animation'),
+      renderer: 'svg',
+      loop: true,
+      autoplay: false,
+      path: '/static/animations/walk-animation.json'
+    });
 
-    for (let ort of sehenswuerdigkeiten) {
-      const koord = await geocodeOrt(ort);
-      if (koord) {
-        punkte.push(koord);
-        const marker = L.marker(koord).addTo(karte).bindPopup(ort);
-        markerListe.push(marker);
-      }
-    }
+  document.getElementById('lade-box-staedtetrip').style.display = "none";
 
-    aktualisiereStoppListe();
-    zeichneRoute();
+   await ladeUndZeigeRoute();
+    
   });
 
   document.getElementById("btnStoppHinzufuegen").addEventListener("click", neuenStoppHinzufuegen);
@@ -148,82 +169,189 @@
     zeigeToast("Stopp hinzugefügt!");
   }
 
-  async function zeichneRoute() {
-    if (punkte.length < 2) return;
-    if (routeLinie) karte.removeLayer(routeLinie);
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "flex";
+  laufAnimation.play();
+}
 
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "none";
+  laufAnimation.pause();
+}
+
+
+async function ladeUndZeigeRoute() {
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation();
+
+    await new Promise(r => setTimeout(r, 100)); 
+
+   punkte.length = 0;
+    markerListe.forEach(m => karte.removeLayer(m));
+    markerListe.length = 0;
+
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) throw new Error("Zielort nicht gefunden");
+    karte.setView(zielKoord, 13);
+
+    for (let ort of sehenswuerdigkeiten) {
+      let koord = await geocodeOrt(ort);
+      if (koord) {
+        punkte.push(koord);
+        const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+        markerListe.push(marker);
+      }
+    }
+
+
+    await zeichneRoute();
+    aktualisiereStoppListe();
+
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+      Routing fehlgeschlagen. Bitte versuche es später erneut. 
+      <button class="button" id="retry-btn"><span>Retry</span></button>
+    `;
+    const retryBtn = document.getElementById("retry-btn");
+    retryBtn.addEventListener("click", async () => {
+      retryBtn.disabled = true;
+      infoBox.textContent = "Bitte warten...";
+      await ladeUndZeigeRoute();
+      retryBtn.disabled = false;
+    });
+
+  } finally {
+    versteckeLadeanimation();
+  }
+}
+
+async function zeichneRoute() {
+    if (punkte.length < 2) return;
+
+    if (routeLinie) {
+        karte.removeLayer(routeLinie);
+    }
+
+    
+    let profile = (aktuellerModus === "transit") ? "driving-car" : "foot-walking";
+    
     const body = {
-      coordinates: punkte.map(p => [p[1], p[0]]),
-      format: "geojson"
+        coordinates: punkte.map(p => [p[1], p[0]]),
+        format: "geojson"
     };
 
     try {
-      const res = await fetch(`https://api.openrouteservice.org/v2/directions/foot-walking/geojson`, {
-        method: "POST",
-        headers: {
-          "Authorization": "5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      routeLinie = L.geoJSON(data, { style: { color: "blue" } }).addTo(karte);
-      karte.fitBounds(routeLinie.getBounds());
-    } catch (err) {
-      console.error(err);
-      zeigeToastError("Routing fehlgeschlagen.");
-    }
-  }
+        const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+            method: "POST",
+            headers: {
+                "Authorization": "5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error("Routing Fehler");
+        const data = await res.json();
 
-  function aktualisiereStoppListe() {
+        routeLinie = L.geoJSON(data, { style: { color: "blue" } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+
+    } catch (err) {
+        console.error(err);
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+        infoBox.innerHTML = `
+        Routing fehlgeschlagen. Bitte versuche es später erneut. 
+        <button class=button id="retry-btn"><span>Retry</span></button>
+      `;
+      const retryBtn = document.getElementById("retry-btn");
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        infoBox.textContent = "Bitte warten...";
+        await zeichneRoute();  // Funktion erneut ausführen
+        // Nach Erfolg oder Fehler wieder aktivieren (je nach Logik)
+        retryBtn.disabled = false;
+      });
+    }
+
+}
+
+function aktualisiereStoppListe() {
     const liste = document.getElementById("sehenswuerdigkeiten-liste");
     liste.innerHTML = "";
 
     sehenswuerdigkeiten.forEach((ort, index) => {
-      const li = document.createElement("li");
-      li.style.display = "flex";
-      li.style.justifyContent = "space-between";
-      li.style.alignItems = "center";
-      li.style.padding = "5px";
-      li.style.border = "1px solid #ccc";
-      li.style.marginBottom = "5px";
+        const li = document.createElement("li");
+        li.style.display = "flex";
+        li.style.justifyContent = "space-between";
+        li.style.alignItems = "center";
+        li.style.padding = "5px";
+        li.style.border = "1px solid #ccc";
+        li.style.marginBottom = "5px";
 
-      const span = document.createElement("span");
-      span.textContent = ort;
-      span.style.cursor = "pointer";
-      span.onclick = () => zeigeStoppInfos(ort, punkte[index][0], punkte[index][1]);
+        const span = document.createElement("span");
+        span.textContent = ort;
+        span.style.cursor = "grab";
 
-      const btnEntfernen = document.createElement("button");
-      btnEntfernen.textContent = "✖";
-      btnEntfernen.title = "Entfernen";
-      btnEntfernen.style.marginLeft = "10px";
-      btnEntfernen.onclick = () => {
-        sehenswuerdigkeiten.splice(index, 1);
-        punkte.splice(index, 1);
-        karte.removeLayer(markerListe[index]);
-        markerListe.splice(index, 1);
-        aktualisiereStoppListe();
-        zeichneRoute();
-      };
+        const btnEntfernen = document.createElement("button");
+        btnEntfernen.textContent = "✖";
+        btnEntfernen.classList.add("entfernen-button");
+        btnEntfernen.style.color = "#dc3545";
+        btnEntfernen.title = "Sehenswürdigkeit entfernen";
+        btnEntfernen.style.marginLeft = "10px";
+        btnEntfernen.style.border = "none";
+        btnEntfernen.style.background = "none"
+        btnEntfernen.addEventListener("click", () => {
+            sehenswuerdigkeiten.splice(index, 1);
+            punkte.splice(index, 1);
+            karte.removeLayer(markerListe[index]);
+            markerListe.splice(index, 1);
+            aktualisiereStoppListe();
+            zeichneRoute();
+        });
 
-      li.appendChild(span);
-      li.appendChild(btnEntfernen);
-      liste.appendChild(li);
+        li.appendChild(span);
+        li.appendChild(btnEntfernen);
+        li.setAttribute("data-index", index);
+
+        liste.appendChild(li);
     });
 
     if (liste._sortable) liste._sortable.destroy();
+
     liste._sortable = Sortable.create(liste, {
-      animation: 150,
-      onEnd: evt => {
-        const { oldIndex, newIndex } = evt;
-        [sehenswuerdigkeiten, punkte, markerListe].forEach(arr => {
-          const el = arr.splice(oldIndex, 1)[0];
-          arr.splice(newIndex, 0, el);
-        });
-        zeichneRoute();
-      }
+        animation: 150,
+        onEnd: (evt) => {
+            const alt = evt.oldIndex;
+            const neu = evt.newIndex;
+
+            // Arrays synchronisieren
+            const ort = sehenswuerdigkeiten.splice(alt, 1)[0];
+            sehenswuerdigkeiten.splice(neu, 0, ort);
+
+            const punkt = punkte.splice(alt, 1)[0];
+            punkte.splice(neu, 0, punkt);
+
+            const marker = markerListe.splice(alt, 1)[0];
+            markerListe.splice(neu, 0, marker);
+
+            ladeUndZeigeRoute();
+        }
     });
-  }
+}
 
   async function zeigeStoppInfos(name, lat, lon) {
     const infoDiv = document.getElementById("stopp-info");

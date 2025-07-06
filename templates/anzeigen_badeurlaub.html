@@ -3,18 +3,18 @@
 {% block title %}Reise anzeigen{% endblock %}
 
 {% block body %}
-    <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland }}</h2>
+    <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland_name }}</h2>
 
     <h4>Reisedaten</h4>
     <p><strong>Anreise:</strong> {{ reise.anreise }} <br>
     <strong>Abreise:</strong> {{ reise.abreise }}</p>
 
-    <p>Zielland: {{ reise.zielland }}</p>
+    <p>Zielland: {{ reise.zielland_name }}</p>
 
     <div class="info-Hotel-Flug">
             {% if reise.fluege and reise.fluege | length >= 1 %}
             <div>
-                <h6><strong>✈️ Flugdetails</strong></h6>
+                <h4><strong>✈️ Flugdetails</strong></h4>
                 <p id="flugInfo">Lade Fluginformationen...</p>
             </div>
             {% else %}
@@ -23,7 +23,7 @@
 
             {% if reise.hotels and reise.hotels | length > 0 %}
             <div>
-                <h6><strong>🏨 Hotels</strong></h6>
+                <h4><strong>🏨 Hotels</strong></h4>
                 <ul>
                 {% for hotel in reise.hotels %}
                     <li>
@@ -98,7 +98,10 @@ if (fluege.length >= 1) {
   }
 }
 
-document.getElementById("flugInfo").innerHTML = flugText;
+const flugBox = document.getElementById("flug-box");
+if (flugBox) {
+  flugBox.innerHTML = flugText;
+}
 
 // Hotelpreise berechnen
 let hotelPreis = 0;

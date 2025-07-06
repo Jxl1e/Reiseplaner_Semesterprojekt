@@ -3,11 +3,12 @@
 {% block title %}Reiseplanung{% endblock %}
 
 {% block body %}
-<h1>Deine Reise nach {{ zielland }}</h1>
+<h1>Deine Reise nach {{ zielland_name }}</h1>
 <h2>Reiseoptionen</h2>
 
 <form action="{{ url_for('reisen.ergebnisse') }}" method="POST" class="reiseformular">
   <input type="hidden" id="zielland" name="zielland" value="{{ zielland }}">
+  <input type="hidden" name="zielland_name" value="{{ zielland_name }}">
 
   <div class="formular-abschnitt">
     <h2>Reiseart auswählen</h2>
@@ -47,10 +48,6 @@
   
   <div id="badeurlaub-options" style="display: none;">
     <div class="formular-abschnitt">
-        <h2>Hotel</h2>
-        <div id="hotel-form">
-          <input type="text" id="hotelname" name="hotelname" placeholder="Name (z.B. Hotel Caravel)" style="margin-bottom: 8px;">
-        </div>
         <h2>Flug</h2>
         <div id="flug-form" style="display: flex;">
           <input type="text" id="von" name="von" placeholder="Start (z.B. FRA)" style="margin-right: 5px;" >
@@ -97,16 +94,20 @@
         <div class="zielort-eingabe">
             <label for="zielort">Zielort eingeben (PLZ oder Ort):</label>
             <div class="autocomplete-wrapper" style="position: relative;">
-                <input type="text" id="zielort" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required>
+                <input type="text" id="zielort" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required class="input-zielort">
                 <ul id="autocomplete-list" class="autocomplete-list"></ul>
             </div>
         </div>
-
-        <button class="button_l" type="submit">
+        <button class="button_l" type="submit" style="margin-left: 25px">
             <span>🔍</span>
         </button>
     </div>
 </form>
+
+<div id="lade-overlay">
+  <div class="spinner"></div>
+  <div class="lade-text">Bitte warten...</div>
+</div>
 
 <div id="toast-error" style="
     visibility: hidden;
@@ -312,9 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-});
-
-function updateStoppsRequired() {
+  function updateStoppsRequired() {
   const visible = document.getElementById('roadtrip-options').style.display !== 'none';
   const radios = document.querySelectorAll('input[name="stopps_option"]');
   radios.forEach(radio => {
@@ -382,14 +381,22 @@ function aktualisiereSehenswuerdigkeitenTags() {
   hiddenInput.value = JSON.stringify(sehenswuerdigkeiten);
 }
 
-const form = document.querySelector('form');
+const form = document.querySelector('.reiseformular');
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  const overlay = document.getElementById('lade-overlay');
+  overlay.style.display = 'flex'; // Lade-Overlay einblenden
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  submitButton.innerHTML = '⏳ Lädt...';
 
   const formData = new FormData(form);
   const reiseart = formData.get('reiseart');
 
-  // Optional Felder abhängig von der Reiseart
+  // Optional: dynamische Daten ergänzen
   if (reiseart === 'Roadtrip') {
     const stoppsOption = formData.get('stopps_option');
     if (stoppsOption === 'manuell') {
@@ -401,19 +408,26 @@ form.addEventListener('submit', async (e) => {
     formData.set('sehenswuerdigkeiten', JSON.stringify(sehenswuerdigkeiten));
   }
 
-  // Füge ggf. Flug- oder Hoteldaten hinzu (z.B. bei Badeurlaub)
+  try {
+    const res = await fetch(form.action, {
+      method: 'POST',
+      body: formData,
+    });
 
-  const res = await fetch(form.action, {
-    method: 'POST',
-    body: formData,
-  });
+    if (res.ok) {
+      window.location.href = res.url;
+    } else {
+      throw new Error("Fehler beim Absenden");
+    }
 
-  if (res.ok) {
-    window.location.href = res.url; // oder zeige Erfolgsmeldung
-  } else {
-    zeigeToastError("Fehler beim Absenden");
+  } catch (err) {
+    zeigeToastError(err.message || "Unbekannter Fehler");
+    submitButton.disabled = false;
+    submitButton.innerHTML = '<span>🔍</span>';
+    overlay.style.display = 'none'; // Lade-Overlay ausblenden
   }
 });
+
 
 function zeigeToastError(message, dauer = 3000) {
     const toast = document.getElementById('toast-error');
@@ -426,6 +440,10 @@ function zeigeToastError(message, dauer = 3000) {
         toast.style.visibility = 'hidden';
     }, dauer);
 }
+
+});
+
+
 
 </script>
 

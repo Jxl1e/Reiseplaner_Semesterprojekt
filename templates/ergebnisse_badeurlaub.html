@@ -3,7 +3,7 @@
 {% block title %}Reiseplan{% endblock %}
 
 {% block body %}
-    <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reisedaten.zielort }}</h1>
+    <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reisedaten.zielland_name }}</h1>
     
 <h6>Reisezeitraum:</h6>
  <p>Anreise: {{ reisedaten.anreise }} <br>
@@ -12,27 +12,80 @@ Abreise: {{ reisedaten.abreise }}</p>
 <h3>Flugangebote für deinen Badeurlaub</h3>
   <p><strong>Von:</strong> {{ reisedaten.flug_von }} | <strong>Nach:</strong> {{ reisedaten.flug_nach }} | <strong>Datum:</strong> {{ reisedaten.anreise }}</p>
 
+  <div id="ausgewaehlte-hotels-container" style="display: none;">
+    <h3>Ausgewählte Hotels</h3>
+    <div id="ausgewaehlte-hotels-liste"></div>
+  </div>
+
   <label for="sortierung">Sortieren nach Preis:</label>
   <select id="sortierung">
     <option value="asc">aufsteigend</option>
     <option value="desc">absteigend</option>
   </select>
 
-  <div id="ladeanimation">⏳ Lade Flugangebote...</div>
+  <div id="ladeanimation">
+
+  <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- Animationspfad (Flugbahn) -->
+    <path id="flugbahn" d="M30,110 C70,70 140,40 200,40 S330,70 370,110" stroke="#0077b6" stroke-width="2" fill="none" />
+
+    <!-- Flugzeug-Grafik aus deinem Code -->
+    <g id="flugzeug" transform="scale(0.08, -0.08)">
+      <g transform="translate(-950,-950)" fill="black" stroke="none">
+        <path d="M501 1243 c15 -39 27 -52 92 -94 60 -39 101 -81 90 -93 -3 -3 2 -6
+          11 -6 22 0 96 -40 96 -52 0 -9 -1 -9 -174 -43 l-130 -26 -91 91 c-70 70 -97
+          90 -118 90 -16 0 -30 -7 -33 -15 -4 -9 3 -53 15 -100 11 -46 21 -86 21 -89 0
+          -2 -26 4 -58 13 -86 26 -106 13 -38 -24 51 -27 54 -31 39 -47 -23 -25 -10 -35
+          59 -42 35 -4 67 -11 73 -15 19 -15 355 6 463 29 86 18 109 20 133 10 22 -9 32
+          -10 43 -1 10 8 21 8 45 -2 17 -7 28 -17 24 -21 -5 -4 4 -5 20 -1 28 8 39 -8
+          12 -19 -20 -7 -19 -42 1 -50 26 -10 44 -7 44 8 0 16 34 31 49 22 5 -3 30 1 57
+          8 27 8 70 17 96 21 52 7 74 30 63 65 -5 17 -16 20 -73 20 -60 0 -65 1 -51 16
+          10 9 85 29 190 50 156 31 175 33 185 19 7 -9 10 -24 7 -34 -3 -11 2 -21 11
+          -24 20 -8 31 10 16 28 -24 29 -2 52 69 74 130 39 142 76 42 125 -75 36 -74 36
+          -483 -43 l-307 -59 -183 68 c-248 91 -253 94 -289 134 -37 43 -52 46 -38 9z"/>
+      </g>
+    </g>
+
+    <!-- AnimateMotion: Das Flugzeug auf der Flugbahn bewegen & mitdrehen -->
+    <animateMotion xlink:href="#flugzeug" dur="5s" repeatCount="indefinite" rotate="auto">
+      <mpath xlink:href="#flugbahn" />
+    </animateMotion>
+
+  </svg>
+
+  <p style="text-align: center; color:#0077b6; font-weight: bold; margin-top: 0.5em;">
+    Flüge werden geladen...
+  </p>
+
+</div>
   <div id="fluege-container"></div>
   <div id="ausgewaehlte-fluege-container" style="display:none;">
   <h3>Ausgewählte Flüge</h3>
   <div id="ausgewaehlte-fluege-liste"></div>
 </div>
 
+<h3>Hotel hinzufügen</h3>
+  <input id="hotelInput" type="text" placeholder="Hotelname eingeben" />  
+  <div class="untere-buttons">
+    <button id="addHotelBtn"  class="button" disabled><span>Hotel hinzufügen</span></button>
+    </div>
+
+  <div id="results"></div>
+
+  <div id="map"></div>
+
 <form id="reise-form" action="{{ url_for('reisen.reise_speichern') }}" method="POST">
     <input type="hidden" name="anreise" value="{{ reisedaten.anreise }}">
     <input type="hidden" name="abreise" value="{{ reisedaten.abreise }}">
     <input type="hidden" name="zielland" value="{{ reisedaten.zielland }}">
+    <input type="hidden" name="zielland_name" value="{{ reisedaten.zielland_name }}">
 
     <input type="hidden" name="reiseart" value="{{ reisedaten.reiseart }}">
 
       <input type="hidden" name="fluege" id="flug-input" value="">
+
+      <input type="hidden" name="hotel" id="hotel-input" value="">
 
     <div class="unten_e">
         <div class="back">
@@ -41,6 +94,8 @@ Abreise: {{ reisedaten.abreise }}</p>
         <button class="button" type="submit"><span>Reise speichern</span></button>
     </div>
 </form>
+
+<div class="space"></div>
 
 <div id="toast" style="
     visibility: hidden;
@@ -165,7 +220,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       data = JSON.parse(text);
     } catch (e) {
       console.error("Fehler beim Parsen:", e);
-      fluegeContainer.innerHTML = "<p>❌ Fehler beim Laden der Flüge.</p>";
+      fluegeContainer.innerHTML = "<p> Fehler beim Laden der Flüge.</p>";
       return;
     }
 
@@ -178,7 +233,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     if (!fluege.length) {
-      fluegeContainer.innerHTML = "<p>🚫 Keine Flüge gefunden.</p>";
+      fluegeContainer.innerHTML = "<p> Keine Flüge gefunden.</p>";
       return;
     }
 
@@ -206,10 +261,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       fluegeContainer.appendChild(div);
 
       div.querySelector(".hinzufuegen-btn").addEventListener("click", () => {
-        // Flug lokal hinzufügen, kein API-Call
         ausgewaehlteFluege.push(flug);
         updateAusgewaehlteFluegeAnzeige();
-        zeigeToast("✅ Flug hinzugefügt!");
+        zeigeToast("Flug hinzugefügt!");
       });
 
       div.querySelector(".rueckflug-btn").addEventListener("click", async () => {
@@ -230,7 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const rueckData = await rueckRes.json();
         const rueckflug = (rueckData.data || [])[0];
         if (!rueckflug) {
-          zeigeToastError("🚫 Kein Rückflug gefunden.");
+          zeigeToastError("Kein Rückflug gefunden.");
           return;
         }
 
@@ -255,7 +309,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         rueckDiv.querySelector(".hinzufuegen-rueckflug-btn").addEventListener("click", () => {
           ausgewaehlteFluege.push(rueckflug);
           updateAusgewaehlteFluegeAnzeige();
-          zeigeToast("✅ Rückflug hinzugefügt!");
+          zeigeToast("Rückflug hinzugefügt!");
           rueckDiv.remove();
         });
       });
@@ -263,6 +317,146 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     updateAusgewaehlteFluegeAnzeige();
   }
+
+  function sterne(rating) {
+  const volle = Math.floor(rating);
+  const dezimal = rating - volle;
+  const halber = dezimal >= 0.25 && dezimal < 0.75 ? 1 : 0;
+  const vollPlus = dezimal >= 0.75 ? 1 : 0;
+  const leer = 5 - volle - halber - vollPlus;
+
+  let html = '';
+  html += '<i class="fas fa-star"></i>'.repeat(volle + vollPlus);
+  if (halber) html += '<i class="fas fa-star-half-alt"></i>';
+  html += '<i class="far fa-star"></i>'.repeat(leer);
+  return html;
+}
+
+    const map = L.map('map').setView([51.1657, 10.4515], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let selectedHotel = null;
+    let marker = null;
+
+    document.getElementById('hotelInput').addEventListener('input', async (e) => {
+      const query = e.target.value;
+      if(query.length < 3) {
+        document.getElementById('results').innerHTML = '';
+        return;
+      }
+
+      const res = await fetch(`/api/google_places?query=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+
+      if(data.status !== 'OK') {
+        resultsDiv.textContent = 'Keine Ergebnisse.';
+        return;
+      }
+
+const markers = [];
+
+data.results
+  .filter(place => place.geometry && place.geometry.location)
+  .forEach(place => {
+    const div = document.createElement('div');
+    div.className = 'hotel-card';
+
+    const lat = place.geometry.location.lat;
+    const lon = place.geometry.location.lng;
+
+    const priceText = place.price_level != null
+      ? '💶'.repeat(place.price_level) || 'Kostenlos'
+      : 'Preisinfo nicht verfügbar';
+
+    const photoUrl = place.photos && place.photos.length > 0
+      ? `/api/place_photo?photo_reference=${place.photos[0].photo_reference}`
+      : 'https://via.placeholder.com/400x200?text=Kein+Bild';
+
+    div.innerHTML = `
+      <img src="${photoUrl}" alt="${place.name}" class="hotel-foto" />
+      <h3>${place.name}</h3>
+      <p>${place.formatted_address}</p>
+      <p>${place.rating != null
+        ? `Bewertung: <span class="sterne-icons">${sterne(place.rating)}</span> (${place.rating})`
+        : 'Keine Bewertung'}</p>
+      <p>${priceText}</p>
+    `;
+  div.onclick = () => {
+    selectedHotel = place;
+    document.getElementById('addHotelBtn').disabled = false;
+
+    document.querySelectorAll('.hotel-card').forEach(c => c.classList.remove('selected'));
+    div.classList.add('selected');
+
+    if (marker) map.removeLayer(marker);
+    const lat = place.geometry.location.lat;
+    const lon = place.geometry.location.lng;
+    marker = L.marker([lat, lon]).addTo(map).bindPopup(place.name).openPopup();
+    map.setView([lat, lon], 15);
+  };
+
+  resultsDiv.appendChild(div);
+
+  const resultMarker = L.marker([
+    place.geometry.location.lat,
+    place.geometry.location.lng
+  ])
+    .addTo(map)
+    .bindPopup(`<strong>${place.name}</strong><br>${place.formatted_address}`);
+
+  markers.push(resultMarker);
+});
+
+markers.forEach(m => map.removeLayer(m));
+markers.length = 0;
+    });
+
+let hotels = [];
+
+document.getElementById("addHotelBtn").addEventListener("click", () => {
+  if (!selectedHotel) return;
+
+  if (!hotels.some(h => h.place_id === selectedHotel.place_id)) {
+    hotels.push({
+      name: selectedHotel.name,
+      address: selectedHotel.formatted_address,
+      rating: selectedHotel.rating,
+      price_level: selectedHotel.price_level,
+      location: selectedHotel.geometry.location,
+      place_id: selectedHotel.place_id,
+      photo: selectedHotel.photos && selectedHotel.photos[0]
+        ? `/api/place_photo?photo_reference=${selectedHotel.photos[0].photo_reference}`
+        : null
+    });
+  }
+
+  document.getElementById("hotel-input").value = JSON.stringify(hotels);
+
+  zeigeToast("Hotel hinzugefügt!");
+  updateHotelListeUI();
+});
+
+function updateHotelListeUI() {
+  const container = document.getElementById('ausgewaehlte-hotels-container');
+  const liste = document.getElementById('ausgewaehlte-hotels-liste');
+  liste.innerHTML = '';
+
+  if (hotels.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  hotels.forEach(hotel => {
+    const div = document.createElement('div');
+    div.textContent = hotel.name + ' — ' + hotel.address;
+    liste.appendChild(div);
+  });
+}
+
 
   async function getIataCode(ort) {
     const res = await fetch(`/api/get_iata_code?ort=${encodeURIComponent(ort)}`);
@@ -273,8 +467,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("reise-form").addEventListener("submit", (event) => {
   const flugInput = document.getElementById("flug-input");
+  const hotelInput = document.getElementById("hotel-input");
+
+  console.log("Wird gesendet:", document.getElementById("hotel-input").value);
 
   flugInput.value = JSON.stringify(ausgewaehlteFluege);
+  hotelInput.value = JSON.stringify(ausgewaehlteHotels)
+  zeigeToast("Reise erfolgreich gespeichert");
 });
 });
 
@@ -301,6 +500,8 @@ function zeigeToastError(message, dauer = 3000) {
         toast.style.visibility = 'hidden';
     }, dauer);
 }
+
+
   </script>
 
 

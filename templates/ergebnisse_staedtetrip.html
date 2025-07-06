@@ -4,6 +4,7 @@
 
 {% block body %}
 <h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reisedaten.zielort }}</h1>
+<h5>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h5>
 
 <div style="display:flex; gap: 20px; height: 80vh;">
   <!-- Linke Seite: Karte -->
@@ -17,31 +18,56 @@
     <div id="routen-info" style="font-weight: bold; margin-bottom: 10px;"></div>
 
     <!-- Infokarten-Bereich -->
-    <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;">
-  <div id="info-karte"
-       style="width: 100%; max-width: 300px; height: 500px; padding: 15px; border-radius: 12px;
-              background: #f8f8f8; border: 1px solid #ddd;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-y: auto;">
-  </div>
-  <div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; width: 100%; max-width: 300px;">
-    <button onclick="zeigeVorigeKarte()" class="info-nav-btn">←</button>
-    <button onclick="zeigeNaechsteKarte()" class="info-nav-btn">→</button>
-  </div>
+    <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; border-radius: 12px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-left: 150px; margin-bottom: 10px; width: 100%; max-width: 300px; margin-top: 8px;">
+      <button id="btnZurueck" onclick="zeigeVorigeKarte()" class="info-nav-btn"><span>←</span></button>
+      <button id="btnWeiter" onclick="zeigeNaechsteKarte()" class="info-nav-btn"><span>→</span></button>
+    </div>
+    <div id="info-karte"
+      style="flex: 1; overflow-y: auto; padding: 10px; border-radius: 12px; min-height: 0; scrollbar-width: thin;">
+    </div>
+ 
 </div>
 
     <!-- Stopps hinzufügen + Liste -->
     <div style="margin-top: 20px;">
       <div style="display: flex; gap: 10px;">
-        <input type="text" id="neuerStopp" placeholder="Stopp hinzufügen..." style="flex:1;" />
-        <button id="btnStoppHinzufuegen">+</button>
+        <input type="text" id="neuerStopp" placeholder="Neue Sehenswürdigkeit..." style="flex:1;" />
+        <button id="btnStoppHinzufuegen" class="button-l"><span>🔍</span></button>
         <select id="modusSelect">
           <option value="foot">Zu Fuß</option>
           <option value="transit">ÖPNV</option>
         </select>
       </div>
-      <ul id="stopp-liste" style="list-style:none; padding-left:0; margin-top:10px;"></ul>
+      <div id="stopp-liste-container" style="flex: 0 0 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; margin-top: 10px; scrollbar-width: thin;">
+        <h3>Stopps sortieren</h3>
+        <ul id="stopp-liste" style="list-style:none; padding-left:0; margin-top:10px;"></ul>
+      </div>
     </div>
   </div>
+</div>
+
+<div id="lade-box-staedtetrip" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="lauf-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
 </div>
 
 <form action="{{ url_for('reisen.reise_speichern') }}" method="POST">
@@ -50,6 +76,7 @@
     <input type="hidden" name="anreise" value="{{ reisedaten.anreise }}">
     <input type="hidden" name="abreise" value="{{ reisedaten.abreise }}">
     <input type="hidden" name="zielland" value="{{ reisedaten.zielland }}">
+    <input type="hidden" name="zielland_name" value="{{ reisedaten.zielland_name }}">
 
     <input type="hidden" name="reiseart" value="{{ reisedaten.reiseart }}">
 
@@ -60,6 +87,8 @@
         <button class="button" type="submit"><span>Reise speichern</span></button>
     </div>
     </form>
+
+    <div class="space"></div>
 
   <div id="toast" style="
     visibility: hidden;
@@ -115,34 +144,25 @@
     let routeLinie = null;
     let aktuellerModus = "foot";
 
+    let laufAnimation;
+
 document.addEventListener("DOMContentLoaded", async () => {
     karte = L.map("karte").setView([51.1657, 10.4515], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap-Mitwirkende"
     }).addTo(karte);
 
-    // Zielort geocoden und Karte zentrieren
-    const zielKoord = await geocodeOrt(zielort);
-    if (!zielKoord) {
-        zeigeToastError("Zielort nicht gefunden");
-        return;
-    }
-    karte.setView(zielKoord, 13);
+  laufAnimation = lottie.loadAnimation({
+    container: document.getElementById('lauf-animation'),
+    renderer: 'svg',
+    loop: true,
+    autoplay: false,
+    path: '/static/animations/walk-animation.json'
+  });
 
-    // Stopps geocoden und Marker setzen
-    for (let ort of sehenswuerdigkeiten) {
-        let koord = await geocodeOrt(ort);
-        if (koord) {
-            punkte.push(koord);
-            const marker = L.marker(koord).addTo(karte).bindPopup(ort);
-            markerListe.push(marker);
-        }
-    }
+  document.getElementById('lade-box-staedtetrip').style.display = "none";
 
-    zeichneRoute();
-
-    aktualisiereStoppListe();
-    zeigeInfosZuOrten();
+ await ladeUndZeigeRoute();
 
     // Event für Hinzufügen Stopps
     document.getElementById("btnStoppHinzufuegen").addEventListener("click", neuenStoppHinzufuegen);
@@ -155,6 +175,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function geocodeOrt(ort) {
+    let infoBox = document.getElementById("routen-info");
+if (!infoBox) {
+    infoBox = document.createElement("div");
+    infoBox.id = "routen-info";
+    infoBox.style.marginTop = "10px";
+    infoBox.style.fontWeight = "bold";
+    infoBox.style.fontSize = "1rem";
+    document.querySelector(".info")?.prepend(infoBox);
+}
+
     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}&limit=1`);
     const daten = await res.json();
     if (daten.length > 0) {
@@ -162,6 +192,78 @@ async function geocodeOrt(ort) {
     }
     return null;
 }
+
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "flex";
+  laufAnimation.play();
+}
+
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "none";
+  laufAnimation.pause();
+}
+
+
+async function ladeUndZeigeRoute() {
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation();
+
+    await new Promise(r => setTimeout(r, 100)); 
+
+   punkte.length = 0;
+    markerListe.forEach(m => karte.removeLayer(m));
+    markerListe.length = 0;
+
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) throw new Error("Zielort nicht gefunden");
+    karte.setView(zielKoord, 13);
+
+    for (let ort of sehenswuerdigkeiten) {
+      let koord = await geocodeOrt(ort);
+      if (koord) {
+        punkte.push(koord);
+        const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+        markerListe.push(marker);
+      }
+    }
+
+
+    await zeichneRoute();
+    await zeigeInfosZuOrten();
+    aktualisiereStoppListe();
+
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+      Routing fehlgeschlagen. Bitte versuche es später erneut. 
+      <button class="button" id="retry-btn"><span>Retry</span></button>
+    `;
+    const retryBtn = document.getElementById("retry-btn");
+    retryBtn.addEventListener("click", async () => {
+      retryBtn.disabled = true;
+      infoBox.textContent = "Bitte warten...";
+      await ladeUndZeigeRoute();
+      retryBtn.disabled = false;
+    });
+
+  } finally {
+    versteckeLadeanimation();
+  }
+}
+
 
 async function zeichneRoute() {
     if (punkte.length < 2) return;
@@ -197,7 +299,18 @@ async function zeichneRoute() {
 
     } catch (err) {
         console.error(err);
-        alert("Routing fehlgeschlagen.");
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+             infoBox.innerHTML = `
+        Routing fehlgeschlagen. Bitte versuche es später erneut. 
+        <button class=button id="retry-btn"><span>Retry</span></button>
+      `;
+      const retryBtn = document.getElementById("retry-btn");
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        infoBox.textContent = "Bitte warten...";
+        await zeichneRoute();
+        retryBtn.disabled = false;
+      });
     }
 }
 
@@ -232,9 +345,7 @@ async function neuenStoppHinzufuegen() {
     markerListe.push(marker);
 
     feld.value = "";
-    aktualisiereStoppListe();
-    zeichneRoute();
-    zeigeInfosZuOrten();
+    ladeUndZeigeRoute();
 }
 
 function aktualisiereStoppListe() {
@@ -256,8 +367,12 @@ function aktualisiereStoppListe() {
 
         const btnEntfernen = document.createElement("button");
         btnEntfernen.textContent = "✖";
-        btnEntfernen.title = "Stopp entfernen";
+        btnEntfernen.classList.add("entfernen-button");
+        btnEntfernen.style.color = "#dc3545";
+        btnEntfernen.title = "Sehenswürdigkeit entfernen";
         btnEntfernen.style.marginLeft = "10px";
+        btnEntfernen.style.border = "none";
+        btnEntfernen.style.background = "transparent"
         btnEntfernen.addEventListener("click", () => {
             sehenswuerdigkeiten.splice(index, 1);
             punkte.splice(index, 1);
@@ -307,19 +422,50 @@ async function zeigeInfosZuOrten() {
 
   infoKarten = [];
 
+  const btnGroup = document.createElement('div');
+    btnGroup.style.marginTop = "10px";
+    btnGroup.classList.add('sehenswuerdigkeiten-button-container');
+
   for (const ort of orte) {
-    const wikiHtml = await ladeWikiInfo(ort);
-    infoKarten.push({ titel: ort, inhalt: wikiHtml });
+    const wikiInfo = await ladeWikiInfo(ort);
+    const karteDiv = document.createElement('div');
+    karteDiv.classList.add('detail-box');
+
+    if (wikiInfo) {
+      karteDiv.innerHTML = `
+        <h3>${wikiInfo.title}</h3>
+        ${wikiInfo.thumbnail ? `<img src="${wikiInfo.thumbnail}" alt="${wikiInfo.title}" style="max-width:100px; float:left; margin-right:10px;">` : ''}
+        <p>${wikiInfo.extract}</p>
+        <a href="${wikiInfo.pageUrl}" target="_blank">Mehr lesen</a>
+        <div style="clear: both;"></div>
+      `;
+    } else {
+      karteDiv.innerHTML = `<h3>Keine Wikipedia-Info für "${ort}" gefunden.</h3>`;
+    }
+
+    infoKarten.push(karteDiv);
   }
 
+  const btn = document.createElement('button');
+        btn.textContent = sehenswuerdigkeiten;
+        btn.classList.add('sehesnwuerdigkeiten-button');
+        btn.addEventListener('click', () => {
+            zeigeInfoIndex(aktuelleKarteIndex);
+        });
+        btnGroup.appendChild(btn);
+
+
   aktuelleKarteIndex = 0;
-  zeigeAktuelleKarte();
+  zeigeAktuelleKarte(); 
 }
 
 function zeigeAktuelleKarte() {
   const container = document.getElementById("info-karte");
-  const karte = infoKarten[aktuelleKarteIndex];
-  container.innerHTML = `<strong>${karte.titel}</strong><br>${karte.inhalt}`;
+  container.innerHTML = '';
+  container.appendChild(infoKarten[aktuelleKarteIndex]);
+
+  document.getElementById("btnZurueck").disabled = aktuelleKarteIndex === 0;
+  document.getElementById("btnWeiter").disabled = aktuelleKarteIndex === infoKarten.length - 1;
 }
 
 function zeigeNaechsteKarte() {
@@ -336,7 +482,7 @@ function zeigeVorigeKarte() {
   }
 }
 
-// Hilfsfunktion: Wikipedia-Infos via Wikipedia API holen
+
 async function ladeWikiInfo(stichwort) {
   const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(stichwort)}`;
 
@@ -345,24 +491,23 @@ async function ladeWikiInfo(stichwort) {
     if (!res.ok) throw new Error("Wiki nicht gefunden");
     const daten = await res.json();
 
-    // Kurzbeschreibung und Link
-    let beschreibung = daten.extract ? daten.extract : "Keine Beschreibung gefunden.";
-    let link = daten.content_urls?.desktop?.page ? daten.content_urls.desktop.page : "#";
-
-    return `${beschreibung} <a href="${link}" target="_blank" rel="noopener">Mehr lesen</a>`;
+    return {
+      title: daten.title || stichwort,
+      extract: daten.extract || "Keine Beschreibung gefunden.",
+      thumbnail: daten.thumbnail?.source || null,
+      pageUrl: daten.content_urls?.desktop?.page || "#"
+    };
   } catch {
-    return "Keine Wikipedia-Informationen verfügbar.";
+    return null;
   }
 }
 
 document.querySelector('form').addEventListener('submit', (e) => {
     const form = e.target;
 
-    // Alle bisherigen Hidden Inputs mit name="sehenswuerdigkeiten" entfernen
     const alteInputs = form.querySelectorAll('input[name="sehenswuerdigkeiten"]');
     alteInputs.forEach(input => input.remove());
 
-    // Neue Hidden Inputs für aktuelle Sehenswürdigkeiten hinzufügen
     for (const ort of sehenswuerdigkeiten) {
         const input = document.createElement('input');
         input.type = 'hidden';
@@ -370,6 +515,7 @@ document.querySelector('form').addEventListener('submit', (e) => {
         input.value = ort;
         form.appendChild(input);
     }
+    zeigeToast("Reise erfolgreich gespeichert!")
 });
 
 function zeigeToast(message, dauer = 3000) {

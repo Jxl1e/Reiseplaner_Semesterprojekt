@@ -6,10 +6,18 @@ html, body {
   position: relative;
 }
 
-
-
 .alert {
   margin-bottom: 0.5rem;
+}
+
+body.init::before{
+  content: "";
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-position: center;
+  z-index: -2;
 }
 
 body.main::before,
@@ -36,7 +44,7 @@ body.main::after {
   z-index: -1;
 }
 
-body.auth::after {
+body.auth::after, body.init::after {
   display: none;
 }
 
@@ -47,12 +55,54 @@ body.main .container.full-viewport {
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
   position: relative;
   z-index: 0;
+
+  max-width: 1300px;     
+  margin: 0 auto;         
+}
+
+body.legal {
+    background: #fdfdfd;
+    color: #222;
+}
+
+body.legal main {
+    background: white;
+    padding: 2rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+body.legal main.container {
+    background: white;
+    padding: 2rem;
+    margin: 2rem auto;   /* horizontal zentrieren */
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    max-width: 800px;
+    text-align: left;    /* Text linksbündig */
 }
 
 .flash_wrapper {
   margin: 1rem auto;
   max-width: 800px;
   padding: 0 1rem;
+}
+
+#scroll-footer {
+  position: fixed;
+  bottom: -100px;
+  left: 0;
+  width: 100%;
+  background-color: #333;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+  transition: bottom 0.5s ease;
+  z-index: 1000;
+  font-size: 0.9rem;
+}
+#scroll-footer.show {
+  bottom: 0;
 }
 
 .hauptbereich {
@@ -118,14 +168,22 @@ body.main .container.full-viewport {
 }
 
 input[type="text"],
-input[type="date"],
-input[type="email"],
-input[type="password"] {
+input[type="date"] {
   font-size: 1rem;
   padding: 0.6rem;
   border-radius: 0.5rem;
+  height: 3.7vh;
+  width: 14vw;
+  border: 1px solid #ccc;
+}
+
+input[type="email"],
+input[type="password"] {
+    font-size: 1rem;
+  padding: 0.6rem;
+  border-radius: 0.5rem;
   height: 5vh;
-  width: 16.5vw;
+  width: 19vw;
   border: 1px solid #ccc;
 }
 
@@ -601,7 +659,7 @@ li {
   justify-content: center;
 }
 
-.space {
+.space-d {
   height: 2vh;
 }
 
@@ -740,7 +798,21 @@ input[type="radio"] {
   transition: 0.3s ease;
 }
 
-.link-b:hover{
+.link.a {
+  color: rgb(102, 230, 255);
+  transition: 0.3s ease;
+}
+
+.link-a:hover {
+  color: rgb(68, 221, 252);;
+}
+
+.link {
+  color: white;
+  transition: 0.3s ease;
+}
+
+.link-b:hover, .link:hover {
   color: rgb(102, 230, 255);
 }
 
@@ -950,13 +1022,10 @@ input[type="radio"] {
 .entfernen-button {
   position: relative;
   overflow: hidden;
-  border: 1px solid #dc3545;
+  border: none;
   border-radius: 12px;
-  background-color: #dc3545;
-  width: 5vw;
-  height: 3vh;
-  margin: 5px;
-  color: white;
+  background-color: transparent;
+  color: #dc3545;
   text-align: center;
   font-weight: bold;
   cursor: pointer;
@@ -965,18 +1034,129 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  line-height: 1;
 }
 
 .entfernen-button:hover {
-  background-color: #a71d2a;
-  color: white;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  color: #a71d2a;
 }
 
-@media screen and (max-width: 767px) {
-  .sidenav {
-    height: auto;
-    padding: 15px;
+.hotel-item {
+  margin-bottom: 12px;
+}
+
+.hotel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.hotel-address {
+  font-size: 0.9em;
+  color: #555;
+  margin-top: 4px;
+}
+
+@keyframes fahren {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+  100% { transform: translateX(0); }
+}
+
+#lade-box {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  background-color: rgba(255, 255, 255, 0.85);
+  padding: 20px;
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.auto-loader {
+  display: inline-block;
+  font-size: 1.2rem;
+  animation: fahren 1.2s infinite ease-in-out;
+  margin-left: 8px;
+}
+
+.auth-header {
+  margin-left: 180px;
+}
+
+.input-zielort {
+  width: 20vw;
+}
+
+.space {
+  height: 9vh;
+}
+
+#lade-overlay {
+  position: fixed; /* oder "absolute" wenn du nur das Formular überlagern willst */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8); /* halbtransparentes Weiß */
+  display: none;
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+#lade-overlay .spinner {
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #333;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+#lade-overlay .lade-text {
+  margin-top: 16px;
+  font-size: 18px;
+  color: #333;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-height: 1080px) {
+  .auth-header {
+    margin-left: 120px;
   }
-  .row.content {height:auto;}
+
+  input[type="email"],
+  input[type="password"]  {
+    width: 19vw;
+  }
+
+  input[type="text"] {
+    width: 19vw;
+  }
+
+input.input-zielort[type="text"] {
+  width: 28vw;
+}
+
+.space {
+  height: 10vh;
+}
+
+input[type="date"] {
+  width: 19vw;
+  margin-bottom: 5px;
+}
+
 }

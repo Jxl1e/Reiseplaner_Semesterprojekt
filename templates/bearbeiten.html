@@ -12,7 +12,7 @@
       <div class="other-info">
         <p class="info-z">Reisezeit: </p>
         <p class="info-e">Entfernung: </p>
-        <p>Reiseziel: {{ reise.zielland }}</p>
+        <p>Reiseziel: {{ reise.zielland_name }}</p>
         <p>Reiseart: {{ reise.reiseart | default('Keine Reiseart angegeben') | title }}</p>
         <form id="reisezeitraum-form">
         <label for="anreise">Anreise:</label>
@@ -23,13 +23,17 @@
         </form>
         {% if reise.hotels and reise.hotels | length > 0 %}
             <div>
-                <h6><strong>🏨 Hotels</strong></h6>
-                <ul>
+                <h4><strong>🏨 Hotels</strong></h4>
+                <ul id="hotel-list">
                 {% for hotel in reise.hotels %}
-                    <li>
-                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
-                    <br>
-                    <small>{{ hotel.address }}</small>
+                    <li class="hotel-item" data-hotel-id="{{ hotel.id or hotel._id }}">
+                    <div class="hotel-top">
+                        <span class="hotel-name">
+                        <strong>{{ hotel.name }}</strong>
+                        <button class="entfernen-button" onclick="entferneHotel('{{ hotel.id or hotel._id }}')">✖</button>
+                        </span>
+                    </div>
+                    <div class="hotel-address">{{ hotel.address }}</div>
                     </li>
                 {% endfor %}
                 </ul>
@@ -39,7 +43,7 @@
             {% endif %}
         {% if reise.fluege and reise.fluege | length >= 1 %}
         <div>
-            <h6><strong>✈️ Flugdetails</strong></h6>
+            <h4><strong>✈️ Flugdetails</strong></h4>
             <p id="flugInfo">Lade Fluginformationen...</p>
         </div>
         {% else %}
@@ -63,6 +67,28 @@
     </div>
     </div>
 </div>
+<div id="lade-box" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="car-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
+</div>
 
 <div class="bearbeiten-buttons">
     <div class="abbrechen">
@@ -70,6 +96,8 @@
     </div>
     <button type="submit" class="button"><span>Speichern</span></button>
 </div>
+
+<div class="space"></div>
 
 <div id="toast" style="
     visibility: hidden;
@@ -124,6 +152,8 @@
     let markerListe = [];
     let routeLinie = null;
 
+    let carAnimation;
+
     console.log("Initial orte:", orte);
 
 
@@ -137,45 +167,119 @@
         attribution: '© OpenStreetMap'
     }).addTo(karte);
 
-    async function ladeUndZeigeRoute() {
-     for (let i = 0; i < orte.length; i++) {
-    const ort = orte[i];
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
-    const daten = await res.json();
-    if (daten.length > 0) {
+   carAnimation = lottie.loadAnimation({
+          container: document.getElementById('car-animation'),
+          renderer: 'svg',
+          loop: true,
+          autoplay: true,
+          path: '/static/animations/car-animation.json'
+        });
+
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "flex";
+  carAnimation.play();
+}
+
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "none";
+  carAnimation.pause();
+}
+
+  async function ladeUndZeigeRoute() {
+let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation(); // Start
+
+    initialPunkte.length = 0;
+    initialMarker.length = 0;
+
+    for (let i = 0; i < orte.length; i++) {
+      const ort = orte[i];
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+      
+      if (!res.ok) throw new Error("Fehler bei Geodaten-Antwort");
+
+      const daten = await res.json();
+
+      if (daten.length > 0) {
         let lat = parseFloat(daten[0].lat);
         let lon = parseFloat(daten[0].lon);
 
         let marker;
         if (i === orte.length - 1) {
-            // Letzter Ort = Ziel → anderer Marker
-            marker = L.marker([lat, lon], {
-                icon: L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 30],
-                    popupAnchor: [0, -30]
-                })
-            }).addTo(karte).bindPopup(ort + " (Ziel)");
+          marker = L.marker([lat, lon], {
+            icon: L.icon({
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+              iconSize: [30, 30],
+              iconAnchor: [15, 30],
+              popupAnchor: [0, -30]
+            })
+          }).addTo(karte).bindPopup(ort + " (Ziel)");
         } else {
-            marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
+          marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
         }
 
         initialMarker.push(marker);
         initialPunkte.push([lat, lon]);
+      }
     }
+
+    punkte = [...initialPunkte];
+    markerListe = [...initialMarker];
+
+    await zeichneRoute();
+    aktualisiereStoppListe();
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await zeichneRoute(); 
+          retryBtn.disabled = false;
+        });
+  } finally {
+    versteckeLadeanimation();
+    
+  }
 }
-        punkte = [...initialPunkte];
-        markerListe = [...initialMarker];
-        zeichneRoute();
 
 
-        aktualisiereStoppListe();
-    }
 
-   async function zeichneRoute() {
-    if (punkte.length <= 1) return;
+async function zeichneRoute() {
 
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+  
+  if (punkte.length <= 1) {
+    return;
+  }
+
+
+  setTimeout(async () => {
     if (routeLinie) karte.removeLayer(routeLinie);
 
     const body = {
@@ -183,40 +287,55 @@
         format: "geojson"
     };
 
-    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-        method: 'POST',
-        headers: {
-            'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
+    try {
+        const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+            method: 'POST',
+            headers: {
+                'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
 
-    const data = await res.json();
-
-    routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
-    karte.fitBounds(routeLinie.getBounds());
-
-    const summary = data.features?.[0]?.properties?.summary;
-    if (summary) {
-        const distKm = (summary.distance / 1000).toFixed(1);
-        const dauerMin = Math.round(summary.duration / 60);
-        const std = Math.floor(dauerMin / 60);
-        const min = dauerMin % 60;
-
-        const infoZ = document.querySelector(".info-z");
-        const infoE = document.querySelector(".info-e");
-
-        if (infoZ) {
-            infoZ.textContent = `Reisezeit: ${std}h ${min}min`;
+        if (!res.ok) {
+            throw new Error(`Routing fehlgeschlagen (Status ${res.status})`);
         }
 
-        if (infoE) {
-            infoE.textContent = `Entfernung: ${distKm} km`;
+        const data = await res.json();
+
+        routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+        zeigeHotels();
+
+        const summary = data.features?.[0]?.properties?.summary;
+        if (summary) {
+            const distKm = (summary.distance / 1000).toFixed(1);
+            const dauerMin = Math.round(summary.duration / 60);
+            const std = Math.floor(dauerMin / 60);
+            const min = dauerMin % 60;
+
+            infoBox.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
         }
+
+    } catch (err) {
+        console.error(err);
+
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+        infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await zeichneRoute(); 
+          retryBtn.disabled = false;
+        });
+        throw err;
     }
-
-    zeigeHotels();
+  }, 50);
 }
 
 console.log("zeigeHotels wird ausgeführt");
@@ -259,7 +378,8 @@ function aktualisiereStoppListe() {
 
         const btnEntfernen = document.createElement("button");
         btnEntfernen.textContent = "✖";
-        btnEntfernen.style.color = "red";
+        btnEntfernen.classList.add("entfernen-button");
+        btnEntfernen.style.color = "#dc3545";
         btnEntfernen.title = "Stopp entfernen";
         btnEntfernen.style.marginLeft = "10px";
         btnEntfernen.style.border = "none";
@@ -393,7 +513,8 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
             body: JSON.stringify({
                 stopps: orte,
                 anreise: anreise,
-                abreise: abreise
+                abreise: abreise,
+                hotels: hotels 
             })
         });
 
@@ -410,17 +531,6 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
     }
 });
 
-fluege.sort((a, b) => {
-  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
-  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
-  return aDate - bDate;
-});
-
-const hinflugSeg = fluege[0].itineraries[0].segments[0];
-
-// Prüfen, ob ein Rückflug existiert
-const rueckflugSeg = fluege.length > 1 ? fluege[1].itineraries[0].segments[0] : null;
-
 const formatDate = (iso) =>
   new Date(iso).toLocaleDateString("de-DE", {
     weekday: "short",
@@ -429,20 +539,109 @@ const formatDate = (iso) =>
     year: "numeric",
   });
 
-let flugText = `
-  🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
-  von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
-`;
+// Flüge nach Datum sortieren
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
 
-if (rueckflugSeg) {
-  flugText += `
-    🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
-    von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}
-  `;
+// HTML-Inhalt leeren und Flüge rendern
+const flugInfoDiv = document.getElementById("flugInfo");
+if(flugInfoDiv) {
+  flugInfoDiv.innerHTML = "";
 }
 
-document.getElementById("flugInfo").innerHTML = flugText;
+fluege.forEach((flug, index) => {
+  const segment = flug.itineraries[0].segments[0];
+
+  const flugDiv = document.createElement("div");
+    flugDiv.id = `flug-${index}`;
+    flugDiv.style.display = "flex";
+    flugDiv.style.alignItems = "center";
+    flugDiv.style.marginBottom = "5px"; 
+    flugDiv.innerHTML = `
+    <span style="flex: 1;">
+        🛫 <strong>Flug:</strong> ${formatDate(segment.departure.at)}
+        von ${segment.departure.iataCode} nach ${segment.arrival.iataCode}
+    </span>
+    <button class="entfernen-button" onclick="entferneFlug(${index})">✖</button>
+    `;
+
+  flugInfoDiv.appendChild(flugDiv);
+});
+
+function entferneFlug(index) {
+  fluege.splice(index, 1);
+  const flugElement = document.getElementById(`flug-${index}`);
+  if (flugElement) {
+    flugElement.remove();
+  }
+}
+
+function entferneHotel(hotelId) {
+  // Filtere das Hotel raus aus dem Array hotels
+  hotels = hotels.filter(hotel => (hotel.id ?? hotel._id) !== hotelId);
+
+  // Liste neu rendern
+  aktualisiereHotelListe();
+
+  zeigeToast("Hotel lokal entfernt. Bitte speichern, um Änderungen zu übernehmen.");
+}
+
+function aktualisiereHotelListe() {
+  const hotelListElement = document.getElementById('hotel-list');
+  if (!hotelListElement) return;
+
+  hotelListElement.innerHTML = '';
+
+  if (hotels.length === 0) {
+    hotelListElement.innerHTML = '<p>🏨 Keine Hotelinformationen verfügbar.</p>';
+    return;
+  }
+
+  hotels.forEach(hotel => {
+    const hotelId = hotel.id ?? hotel._id;
+
+    // Neues <li>
+    const li = document.createElement('li');
+    li.classList.add('hotel-item');
+    li.setAttribute('data-hotel-id', hotelId);
+
+    // Container für Hotelname + Button
+    const row = document.createElement('div');
+    row.classList.add('hotel-row');
+
+    const nameSpan = document.createElement('span');
+    nameSpan.innerHTML = `<strong>${hotel.name}</strong> – ${hotel.price ?? ''} ${hotel.currency ?? ''}`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'entfernen-button';
+    removeBtn.title = 'Hotel entfernen';
+    removeBtn.textContent = '✖';
+    removeBtn.addEventListener('click', () => entferneHotel(hotelId));
+
+    row.appendChild(nameSpan);
+    row.appendChild(removeBtn);
+
+    // Adresse
+    const addr = document.createElement('div');
+    addr.classList.add('hotel-address');
+    addr.textContent = hotel.address ?? '';
+
+    // Alles zusammenfügen
+    li.appendChild(row);
+    li.appendChild(addr);
+    hotelListElement.appendChild(li);
+  });
+}
+
+
+
+
+
 
 
 </script>
 {% endblock %}
+

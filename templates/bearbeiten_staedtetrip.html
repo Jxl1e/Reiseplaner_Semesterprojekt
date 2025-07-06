@@ -12,7 +12,7 @@
       <div class="other-info">
         <p class="info-z">Reisezeit:</p>
         <p class="info-e">Entfernung: </p>
-        <p>Reiseziel: {{ reise.zielland }}</p>
+        <p>Reiseziel: {{ reise.zielort }}</p>
         <p>Reiseart: {{ reise.reiseart | default('Keine Reiseart angegeben') | title}}</p>
         <form id="reisezeitraum-form">
         <label for="anreise">Anreise:</label>
@@ -23,7 +23,7 @@
         </form>
         {% if reise.hotels and reise.hotels | length > 0 %}
             <div>
-                <h6><strong>🏨 Hotels</strong></h6>
+                <h4><strong>🏨 Hotels</strong></h4>
                 <ul>
                 {% for hotel in reise.hotels %}
                     <li>
@@ -39,7 +39,7 @@
             {% endif %}
         {% if reise.fluege and reise.fluege | length >= 1 %}
         <div>
-            <h6><strong>✈️ Flugdetails</strong></h6>
+            <h4><strong>✈️ Flugdetails</strong></h4>
             <p id="flugInfo">Lade Fluginformationen...</p>
         </div>
         {% else %}
@@ -64,12 +64,37 @@
     </div>
 </div>
 
+<div id="lade-box-staedtetrip" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="lauf-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
+</div>
+
 <div class="bearbeiten-buttons">
     <div class="abbrechen">
             <a class="button_abr" style="text-decoration: none;" href="{{ url_for('reisen.anzeigen_staedtetrip', reise_id=reise._id)}}"><span>Abbrechen</span></a>
     </div>
     <button type="submit" class="button"><span>Speichern</span></button>
 </div>
+
+<div class="space"></div>
 
 <div id="toast" style="
     visibility: hidden;
@@ -134,27 +159,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         attribution: "© OpenStreetMap-Mitwirkende"
     }).addTo(karte);
 
-    // Zielort geocoden und Karte zentrieren
-    const zielKoord = await geocodeOrt(zielort);
-    if (!zielKoord) {
-        alert("Zielort nicht gefunden");
-        return;
-    }
-    karte.setView(zielKoord, 13);
+    laufAnimation = lottie.loadAnimation({
+      container: document.getElementById('lauf-animation'),
+      renderer: 'svg',
+      loop: true,
+      autoplay: false,
+      path: '/static/animations/walk-animation.json'
+  });
 
-    // Stopps geocoden und Marker setzen
-    for (let ort of sehenswuerdigkeiten) {
-        let koord = await geocodeOrt(ort);
-        if (koord) {
-            punkte.push(koord);
-            const marker = L.marker(koord).addTo(karte).bindPopup(ort);
-            markerListe.push(marker);
-        }
-    }
+  document.getElementById('lade-box-staedtetrip').style.display = "none";
 
-    zeichneRoute();
-    aktualisiereStoppListe();
-
+ await ladeUndZeigeRoute();
 });
 
   async function geocodeOrt(ort) {
@@ -164,6 +179,76 @@ document.addEventListener("DOMContentLoaded", async () => {
         return [parseFloat(daten[0].lat), parseFloat(daten[0].lon)];
     }
     return null;
+}
+
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "flex";
+  laufAnimation.play();
+}
+
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "none";
+  laufAnimation.pause();
+}
+
+
+async function ladeUndZeigeRoute() {
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation();
+
+    await new Promise(r => setTimeout(r, 100)); 
+
+   punkte.length = 0;
+    markerListe.forEach(m => karte.removeLayer(m));
+    markerListe.length = 0;
+
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) throw new Error("Zielort nicht gefunden");
+    karte.setView(zielKoord, 13);
+
+    for (let ort of sehenswuerdigkeiten) {
+      let koord = await geocodeOrt(ort);
+      if (koord) {
+        punkte.push(koord);
+        const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+        markerListe.push(marker);
+      }
+    }
+
+
+    await zeichneRoute();
+    aktualisiereStoppListe();
+
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+      Routing fehlgeschlagen. Bitte versuche es später erneut. 
+      <button class="button" id="retry-btn"><span>Retry</span></button>
+    `;
+    const retryBtn = document.getElementById("retry-btn");
+    retryBtn.addEventListener("click", async () => {
+      retryBtn.disabled = true;
+      infoBox.textContent = "Bitte warten...";
+      await ladeUndZeigeRoute();
+      retryBtn.disabled = false;
+    });
+
+  } finally {
+    versteckeLadeanimation();
+  }
 }
 
 async function zeichneRoute() {
@@ -201,7 +286,19 @@ async function zeichneRoute() {
 
     } catch (err) {
         console.error(err);
-        alert("Routing fehlgeschlagen.");
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+        infoBox.innerHTML = `
+        Routing fehlgeschlagen. Bitte versuche es später erneut. 
+        <button class=button id="retry-btn"><span>Retry</span></button>
+      `;
+      const retryBtn = document.getElementById("retry-btn");
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        infoBox.textContent = "Bitte warten...";
+        await zeichneRoute();  // Funktion erneut ausführen
+        // Nach Erfolg oder Fehler wieder aktivieren (je nach Logik)
+        retryBtn.disabled = false;
+      });
     }
 
 }
@@ -264,7 +361,8 @@ function aktualisiereStoppListe() {
 
         const btnEntfernen = document.createElement("button");
         btnEntfernen.textContent = "✖";
-        btnEntfernen.style.color = "red";
+        btnEntfernen.classList.add("entfernen-button");
+        btnEntfernen.style.color = "#dc3545";
         btnEntfernen.title = "Sehenswürdigkeit entfernen";
         btnEntfernen.style.marginLeft = "10px";
         btnEntfernen.style.border = "none";
@@ -408,17 +506,6 @@ document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventList
     }
 });
 
-fluege.sort((a, b) => {
-  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
-  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
-  return aDate - bDate;
-});
-
-const hinflugSeg = fluege[0].itineraries[0].segments[0];
-
-// Prüfen, ob ein Rückflug existiert
-const rueckflugSeg = fluege.length > 1 ? fluege[1].itineraries[0].segments[0] : null;
-
 const formatDate = (iso) =>
   new Date(iso).toLocaleDateString("de-DE", {
     weekday: "short",
@@ -427,20 +514,47 @@ const formatDate = (iso) =>
     year: "numeric",
   });
 
-let flugText = `
-  🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
-  von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
-`;
+// Flüge nach Datum sortieren
+fluege.sort((a, b) => {
+  const aDate = new Date(a.itineraries[0].segments[0].departure.at);
+  const bDate = new Date(b.itineraries[0].segments[0].departure.at);
+  return aDate - bDate;
+});
 
-if (rueckflugSeg) {
-  flugText += `
-    🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
-    von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}
-  `;
+// HTML-Inhalt leeren und Flüge rendern
+const flugInfoDiv = document.getElementById("flugInfo");
+if(flugInfoDiv) {
+  flugInfoDiv.innerHTML = "";
 }
 
-document.getElementById("flugInfo").innerHTML = flugText;
+fluege.forEach((flug, index) => {
+  const segment = flug.itineraries[0].segments[0];
+
+  const flugDiv = document.createElement("div");
+    flugDiv.id = `flug-${index}`;
+    flugDiv.style.display = "flex";
+    flugDiv.style.alignItems = "center";
+    flugDiv.style.marginBottom = "5px"; 
+    flugDiv.innerHTML = `
+    <span style="flex: 1;">
+        🛫 <strong>Flug:</strong> ${formatDate(segment.departure.at)}
+        von ${segment.departure.iataCode} nach ${segment.arrival.iataCode}
+    </span>
+    <button class="entfernen-button" onclick="entferneFlug(${index})">✖</button>
+    `;
+
+  flugInfoDiv.appendChild(flugDiv);
+});
+
+function entferneFlug(index) {
+  fluege.splice(index, 1);
+  const flugElement = document.getElementById(`flug-${index}`);
+  if (flugElement) {
+    flugElement.remove();
+  }
+}
 
 
 </script>
 {% endblock %}
+

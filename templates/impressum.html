@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block css %}
+<style>
+  body.legal {
+    background-color: #f9f9f9;
+    color: #222;
+  }
+
+  body.legal main.container {
+    background: white;
+    padding: 2rem;
+    margin-top: 2rem;
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    max-width: 800px;
+  }
+
+  body.legal .link-l {
+    color: #007bff;
+    text-decoration: none;
+  }
+
+  body.legal .link-l:hover {
+    text-decoration: underline;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<main class="container full-viewport">
+  <h1>Impressum</h1>
+
+  <h2>Angaben gemäß § 5 TMG:</h2>
+  <p>
+      Julia Wöhrle<br>
+      Gewerbestr. 17<br>
+      86854 Amberg<br>
+      Deutschland
+  </p>
+
+  <p>
+      E-Mail: <a class="link-l" href="mailto:julia.woehrle@stud.hs-kempten.de">julia.woehrle@stud.hs-kempten.de</a><br>
+      Telefon: +49 123 4567890
+  </p>
+
+  <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:</h2>
+  <p>
+      Julia Wöhrle<br>
+      Adresse wie oben
+  </p>
+
+  <h2>Haftungsausschluss</h2>
+  <h3>Haftung für Inhalte</h3>
+  <p>
+      Die Inhalte dieser Website wurden mit größtmöglicher Sorgfalt erstellt. Für die Richtigkeit,
+      Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.
+  </p>
+
+  <h3>Haftung für Links</h3>
+  <p>
+      Diese Website enthält Links zu externen Webseiten Dritter, auf deren Inhalte ich keinen Einfluss habe.
+      Deshalb kann ich für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten
+      Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.
+  </p>
+
+  <h2>Urheberrecht</h2>
+  <p>
+      Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser Website unterliegen dem deutschen Urheberrecht.
+      Beiträge Dritter sind als solche gekennzeichnet. Die Vervielfältigung, Bearbeitung und jede Art der Verwertung
+      außerhalb der Grenzen des Urheberrechts bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+  </p>
+
+  <h2>Datenquellen & APIs</h2>
+  <p>Diese Webanwendung verwendet Daten aus öffentlich zugänglichen oder lizenzierten APIs. Die Rechte verbleiben bei den jeweiligen Anbietern:</p>
+  <ul>
+      <li><strong><a class="link-l" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">OpenStreetMap</a></strong> – Kartendaten © OpenStreetMap-Mitwirkende, verfügbar unter der <a class="link-l" href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL-Lizenz</a>.</li>
+      <li><strong><a class="link-l" href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">Nominatim</a></strong> – Geokodierungsdienst basierend auf OpenStreetMap-Daten.</li>
+      <li><strong><a class="link-l" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a></strong> – Orts- und Geodaten.</li>
+      <li><strong><a class="link-l" href="https://www.wikipedia.org/" target="_blank" rel="noopener noreferrer">Wikipedia</a></strong> – Inhalte unter der <a class="link-l" href="https://creativecommons.org/licenses/by-sa/3.0/deed.de" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0-Lizenz</a>.</li>
+      <li><strong><a class="link-l" href="https://overpass-api.de/" target="_blank" rel="noopener noreferrer">Overpass API</a></strong> – Zugriff auf OSM-Daten (z. B. POIs).</li>
+      <li><strong><a class="link-l" href="https://developers.amadeus.com/" target="_blank" rel="noopener noreferrer">Amadeus Travel APIs</a></strong> – Reise- und Fluginformationen.</li>
+      <li><strong><a class="link-l" href="https://developers.google.com/maps/documentation/places/web-service/overview" target="_blank" rel="noopener noreferrer">Google Places API</a></strong> – Ortsdaten und Bewertungen. Es gelten die <a class="link-l" href="https://cloud.google.com/maps-platform/terms" target="_blank" rel="noopener noreferrer">Google-Nutzungsbedingungen</a>.</li>
+      <li><strong><a class="link-l" href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer">OpenRouteService</a></strong> – Routing, bereitgestellt durch HeiGIT, basierend auf OpenStreetMap-Daten.</li>
+  </ul>
+  <p>
+      Diese Datenquellen dienen ausschließlich der nicht-kommerziellen Reiseplanung. Die Anbieter übernehmen keine Gewähr für die Richtigkeit, Aktualität oder Verfügbarkeit der bereitgestellten Informationen.
+  </p>
+
+  <h2>Datenschutz</h2>
+  <p>Siehe <a class="link-l" href="/datenschutz">Datenschutzerklärung</a>.</p>
+</main>
+{% endblock %}

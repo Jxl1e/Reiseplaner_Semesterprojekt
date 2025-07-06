@@ -32,20 +32,26 @@ def login():
         user = users.find_one({"email": request.form["email"]})
         if user and bcrypt.check_password_hash(user["password"], request.form["password"]):
             login_user(User(user))
-            flash("Login erfolgreich.", "success")
+            flash("Login erfolgreich. Willkommen zurück!", "success")
             next_page = request.args.get('next')
             return redirect(next_page or url_for('reisen.dashboard'))
         else:
-            flash("Login fehlgeschlagen. Bitte erneut versuchen", "danger")
+            flash("Login fehlgeschlagen. Bitte erneut versuchen", "error")
     return render_template('login.html')      
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
         hashed_pw = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')
+        email = request.form["email"]
+
         users.insert_one({"email": request.form["email"], "password": hashed_pw})
-        flash("Registrieren erfolgreich. Bitte Anmelden.", "success")
-        return redirect(url_for('auth.login'))
+
+        user = users.find_one({"email": email})
+        login_user(User(user)) 
+
+        flash("Registrierung erfolgreich. Willkommen!", "success")
+        return redirect(url_for('reisen.initial_dashboard'))
     return render_template('register.html')
 
 @auth_bp.route("/logout")
@@ -54,3 +60,4 @@ def logout():
     logout_user()
     flash("Erfolgreich ausgeloggt.", "success")  
     return redirect(url_for('reisen.index'))
+

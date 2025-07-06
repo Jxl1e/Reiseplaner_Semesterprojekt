@@ -4,6 +4,7 @@
 
 {% block body %}
 <h1>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielort }}</h1>
+<h3>von {{ reise.anreise or "?" }} bis {{ reise.abreise or "?" }}</h3>
 <div class="oben-s">
   <div style="display:flex; gap: 20px; height: 80vh;">
     <!-- Linke Seite: Karte -->
@@ -13,20 +14,16 @@
 
     <!-- Rechte Seite -->
     <div style="flex: 1.2; max-width: 360px; display: flex; flex-direction: column; height: 100%;">
-      <div class="reisezeitraum">
-        <p><strong>Anreise:</strong> {{ reise.anreise }}</p>
-        <p><strong>Abreise:</strong> {{ reise.abreise }}</p>
-      </div>
       <!-- Reiseinfos -->
       <div id="routen-info" style="font-weight: bold; margin-bottom: 10px;"></div>
 
       <!-- Infokarten-Bereich -->
-      <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; ">
-      <div style="display: flex; align-items: center; gap: 8px; margin-left: 150px; margin-bottom: 10px; width: 100%; max-width: 300px;">
+      <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; border-radius: 12px; max-height: 500px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-left: 150px; margin-bottom: 10px; width: 100%; max-width: 300px; margin-top: 8px;">
         <button id="btnZurueck" onclick="zeigeVorigeKarte()" class="info-nav-btn"><span>←</span></button>
         <button id="btnWeiter" onclick="zeigeNaechsteKarte()" class="info-nav-btn"><span>→</span></button>
     </div>
-    <div id="info-karte" style="width: 100%; max-width: 300px; height: 500px; padding: 15px; border-radius: 12px; background: #f8f8f8; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-y: auto; scrollbar-width: thin;">
+    <div id="info-karte" style="flex: 1; overflow-y: auto; padding: 10px; border-radius: 12px; min-height: 0; scrollbar-width: thin;">
     </div>
     
   </div>
@@ -34,7 +31,7 @@
   <div class="info-Hotel-Flug">
               {% if reise.fluege and reise.fluege | length >= 1 %}
               <div>
-                  <h6><strong>✈️ Flugdetails</strong></h6>
+                  <h4><strong>✈️ Flugdetails</strong></h4>
                   <p id="flugInfo">Lade Fluginformationen...</p>
               </div>
               {% else %}
@@ -43,7 +40,7 @@
 
               {% if reise.hotels and reise.hotels | length > 0 %}
               <div>
-                  <h6><strong>🏨 Hotels</strong></h6>
+                  <h4><strong>🏨 Hotels</strong></h4>
                   <ul>
                   {% for hotel in reise.hotels %}
                       <li>
@@ -61,11 +58,33 @@
           </div>
           <div class="linie"></div>
           <div class="preis">
-              <p>Gesamtpreis</p>
-              <div id="gesamtPreis"></div>
-          </div>
+            <div id="gesamtPreis">0,00€</div>
+        </div>
 
   </div>
+</div>
+
+<div id="lade-box-staedtetrip" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="lauf-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
 </div>
 
     <div class="anzeigen-buttons">
@@ -75,8 +94,48 @@
     <a href="{{ url_for('reisen.edit_staedtetrip', reise_id=reise._id) }}" class="button" style="text-decoration: none;"><span>Reise bearbeiten</span></a>
     </div>
 
-   
+    <div class="space"></div>
 
+   
+<div id="toast" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #4BB543;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
+
+<div id="toast-error" style="
+    visibility: hidden;
+    opacity: 0;
+    min-width: 250px;
+    background-color: #ce0000;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;">
+    Erfolgreich gespeichert!
+</div>
 
 <script>
     var zielort = {{ reise.zielort | tojson | safe }};
@@ -100,33 +159,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         attribution: "© OpenStreetMap-Mitwirkende"
     }).addTo(karte);
 
-    // Zielort geocoden und Karte zentrieren
-    const zielKoord = await geocodeOrt(zielort);
-    if (!zielKoord) {
-        alert("Zielort nicht gefunden");
-        return;
-    }
-    karte.setView(zielKoord, 13);
+    laufAnimation = lottie.loadAnimation({
+      container: document.getElementById('lauf-animation'),
+      renderer: 'svg',
+      loop: true,
+      autoplay: false,
+      path: '/static/animations/walk-animation.json'
+  });
 
-    // Stopps geocoden und Marker setzen
-    for (let ort of sehenswuerdigkeiten) {
-        let koord = await geocodeOrt(ort);
-        if (koord) {
-            punkte.push(koord);
-            const marker = L.marker(koord).addTo(karte).bindPopup(ort);
-            markerListe.push(marker);
-        }
-    }
+  document.getElementById('lade-box-staedtetrip').style.display = "none";
 
-    zeichneRoute();
-
-    zeigeInfosZuOrten();
-
-    // Umschalter Fuß/ÖPNV
-    document.getElementById("modusSelect").addEventListener("change", async (e) => {
-        aktuellerModus = e.target.value;
-        zeichneRoute();
-    });
+ await ladeUndZeigeRoute();
 });
 
 async function geocodeOrt(ort) {
@@ -136,6 +179,76 @@ async function geocodeOrt(ort) {
         return [parseFloat(daten[0].lat), parseFloat(daten[0].lon)];
     }
     return null;
+}
+
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "flex";
+  laufAnimation.play();
+}
+
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box-staedtetrip");
+  ladeBox.style.display = "none";
+  laufAnimation.pause();
+}
+
+
+async function ladeUndZeigeRoute() {
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation();
+
+    await new Promise(r => setTimeout(r, 100)); 
+
+   punkte.length = 0;
+    markerListe.forEach(m => karte.removeLayer(m));
+    markerListe.length = 0;
+
+    const zielKoord = await geocodeOrt(zielort);
+    if (!zielKoord) throw new Error("Zielort nicht gefunden");
+    karte.setView(zielKoord, 13);
+
+    for (let ort of sehenswuerdigkeiten) {
+      let koord = await geocodeOrt(ort);
+      if (koord) {
+        punkte.push(koord);
+        const marker = L.marker(koord).addTo(karte).bindPopup(ort);
+        markerListe.push(marker);
+      }
+    }
+
+
+    await zeichneRoute();
+    await zeigeInfosZuOrten();
+
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+      Routing fehlgeschlagen. Bitte versuche es später erneut. 
+      <button class="button" id="retry-btn"><span>Retry</span></button>
+    `;
+    const retryBtn = document.getElementById("retry-btn");
+    retryBtn.addEventListener("click", async () => {
+      retryBtn.disabled = true;
+      infoBox.textContent = "Bitte warten...";
+      await ladeUndZeigeRoute();
+      retryBtn.disabled = false;
+    });
+
+  } finally {
+    versteckeLadeanimation();
+  }
 }
 
 async function zeichneRoute() {
@@ -173,8 +286,19 @@ async function zeichneRoute() {
 
     } catch (err) {
         console.error(err);
-        alert("Routing fehlgeschlagen.");
-    }
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+          infoBox.innerHTML = `
+        Routing fehlgeschlagen. Bitte versuche es später erneut. 
+        <button class=button id="retry-btn"><span>Retry</span></button>
+      `;
+      const retryBtn = document.getElementById("retry-btn");
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        infoBox.textContent = "Bitte warten...";
+        await zeichneRoute();
+        retryBtn.disabled = false;
+      });
+          }
 }
 console.log("zeigeHotels wird ausgeführt");
 function zeigeHotels() {
@@ -242,7 +366,7 @@ async function zeigeInfosZuOrten() {
 
   const btnGroup = document.createElement('div');
     btnGroup.style.marginTop = "10px";
-    btnGroup.classList.add('ort-button-container');
+    btnGroup.classList.add('sehenswuerdigkeiten-button-container');
 
   for (const ort of orte) {
     const wikiInfo = await ladeWikiInfo(ort);
@@ -265,26 +389,32 @@ async function zeigeInfosZuOrten() {
   }
 
   const btn = document.createElement('button');
-        btn.textContent = orte;
-        btn.classList.add('ort-button');
+        btn.textContent = sehenswuerdigkeiten;
+        btn.classList.add('sehesnwuerdigkeiten-button');
         btn.addEventListener('click', () => {
-            zeigeInfoIndex(i);
+            zeigeInfoIndex(aktuelleKarteIndex);
         });
         btnGroup.appendChild(btn);
 
 
   aktuelleKarteIndex = 0;
-  zeigeAktuelleKarte();
-
-  
-  
+  zeigeAktuelleKarte(); 
 }
 
 function zeigeAktuelleKarte() {
   const container = document.getElementById("info-karte");
   container.innerHTML = '';
-  container.appendChild(infoKarten[aktuelleKarteIndex]);
 
+  const aktuelleKarte = infoKarten[aktuelleKarteIndex];
+  console.log("Aktuelle Karte:", aktuelleKarteIndex, aktuelleKarte);
+
+  if (!aktuelleKarte) {
+    container.innerHTML = "<p>Keine Infos verfügbar.</p>";
+    return;
+  }
+
+  container.appendChild(aktuelleKarte);
+  
   document.getElementById("btnZurueck").disabled = aktuelleKarteIndex === 0;
   document.getElementById("btnWeiter").disabled = aktuelleKarteIndex === infoKarten.length - 1;
 }
@@ -369,7 +499,10 @@ if (fluege.length >= 1) {
   }
 }
 
-document.getElementById("flugInfo").innerHTML = flugText;
+const flugBox = document.getElementById("flugInfo");
+if (flugBox) {
+  flugBox.innerHTML = flugText;
+}
 
 // Hotelpreise berechnen
 let hotelPreis = 0;
@@ -395,7 +528,31 @@ if (document.getElementById("preisInfo")) {
 }
 
 // Gesamtpreis anzeigen
-document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Flug + Hotel): ${formatPreis(gesamt)}`;
+document.getElementById("gesamtPreis").innerText = `🧳 Gesamtpreis (Hotel + Flug): ${formatPreis(gesamt)}`;
+
+function zeigeToast(message, dauer = 3000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
+
+function zeigeToastError(message, dauer = 3000) {
+    const toast = document.getElementById('toast-error');
+    toast.textContent = message;
+    toast.style.visibility = 'visible';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.visibility = 'hidden';
+    }, dauer);
+}
 
 </script>
 {% endblock %}

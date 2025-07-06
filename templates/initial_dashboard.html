@@ -1,89 +1,141 @@
 {% extends "base.html" %}
 
-{% block title %}Meine Reisen{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block body %}
+<style>
+ html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: Arial, sans-serif;
+  }
 
-<h2>Meine Reisen</h2>
+  .intro-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
 
-<div class="cont">
-  {% for reise in reisen %}
-    {% if reise.reiseart == 'roadtrip' %}
-    {% set detail_url = url_for('reisen.anzeigen', reise_id=reise._id) %}
-  {% elif reise.reiseart == 'städtetrip' %}
-    {% set detail_url = url_for('reisen.anzeigen_staedtetrip', reise_id=reise._id) %}
-  {% elif reise.reiseart == 'badeurlaub' %}
-    {% set detail_url = url_for('reisen.anzeigen_badeurlaub', reise_id=reise._id) %}
-  {% else %}
-    {% set detail_url = '#' %}
-  {% endif %}
-<div class="card" data-url="{{ detail_url }}">
-    {% if reise.reiseart == 'roadtrip' %}
-    <p><strong>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }}  {{ reise.zielland_name }}:</strong> {{ reise.anreise }} bis {{ reise.abreise }} </p>
-    <p>  🛑 Zwischenstopps:
-    {% if reise.stopps and reise.stopps|length > 1 %}
-      {{ reise.stopps | join(' → ') }}
-    {% elif reise.stopps %}
-      {{ reise.stopps[0] }}
-    {% else %}
-      Keine Stopps ausgewählt.
-    {% endif %}
-    </p>
-    {% elif reise.reiseart == 'städtetrip' %}
-      <p><strong>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} {{ reise.zielort }}:</strong> {{ reise.anreise }} bis {{reise.abreise }} </p>
-      <p> 🗽 Sehenswürdigkeiten: 
-        {% if reise.sehenswuerdigkeiten and reise.sehenswuerdigkeiten|length > 1 %}
-          {{ reise.sehenswuerdigkeiten | join(' → ') }}
-        {% elif reise.sehenswuerdigkeiten %}
-          {{ reise.sehenswuerdigkeiten[0] }}
-        {% else %}
-          Keine Sehenswürdigkeiten ausgewählt
-        {% endif %}
-      </p>
+  .image-strip {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
 
-    {% elif reise.reiseart == 'badeurlaub' %}
-      <p><strong>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }}  {{ reise.zielland_name }}:</strong> {{ reise.anreise }} bis {{ reise.abreise }} </p>
-      <p>
-        {% if reise.fluege and reise.fluege | length >= 1 %}
-            <div>
-                <h4><strong>✈️ Flugdetails</strong></h4>
-                <p id="flugInfo">Lade Fluginformationen...</p>
-            </div>
-            {% else %}
-                <p>✈️ Keine Flugdaten verfügbar.</p>
-            {% endif %}
+  .image-box {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
 
-            {% if reise.hotels and reise.hotels | length > 0 %}
-            <div>
-                <h4><strong>🏨 Hotels</strong></h4>
-                <ul>
-                {% for hotel in reise.hotels %}
-                    <li>
-                    <strong>{{ hotel.name }}</strong> – {{ hotel.price }} {{ hotel.currency }}
-                    <br>
-                    <small>{{ hotel.address }}</small>
-                    </li>
-                {% endfor %}
-                </ul>
-            </div>
-            {% else %}
-            <p>🏨 Keine Hotelinformationen verfügbar.</p>
-            {% endif %}
-            <p id="preisInfo"></p>
-      </p>
-    {% endif %}
-</div>
-  {% endfor %}
-</div>
+  .image-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
+  .label {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+    font-size: 1.3rem;
+  }
 
-<div class="space-d"></div>
+  /* Willkommensbox absolut über den Bildern */
+  .welcome-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255,255,255,0.9);
+    padding: 2rem 3rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    text-align: center;
+    z-index: 10;
+    max-width: 800px;
+    width: 80%;
+  }
 
-<div class="unten_d">
-  <form action="{{ url_for('reisen.add') }}" method="get" class="land-auswahl-form">
-    <label for="zielland">Zielland auswählen:</label>
-    <select name="zielland" id="zielland" required>
-  <option value="">Bitte wählen</option>
+  .welcome-box h1 {
+    margin-bottom: 1rem;
+    font-size: 2rem;
+    color: #333;
+  }
+
+  .welcome-box p {
+    margin-bottom: 1rem;
+    color: #666;
+  }
+
+  /* Slide-in Animation */
+  @keyframes slideInLeft {
+    from { transform: translateX(-150%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideInTop {
+    from { transform: translateY(-150%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes slideInRight {
+    from { transform: translateX(150%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .slide-in-left {
+    animation: slideInLeft 1s forwards;
+    animation-delay: 0.2s;
+    opacity: 0;
+  }
+  .slide-in-top {
+    animation: slideInTop 1s forwards;
+    animation-delay: 0.7s;
+    opacity: 0;
+  }
+  .slide-in-right {
+    animation: slideInRight 1s forwards;
+    animation-delay: 1.2s;
+    opacity: 0;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+</style>
+
+<div class="intro-container">
+
+  <div class="image-strip">
+
+  <div class="image-strip">
+    <div class="image-box slide-in-left">
+      <img src="{{ url_for('static', filename='images/beach.jpg') }}" alt="Badeurlaub">
+      <div class="label">Badeurlaub</div>
+    </div>
+    <div class="image-box slide-in-top">
+      <img src="{{ url_for('static', filename='images/city.jpg') }}" alt="Städtetrip">
+      <div class="label">Städtetrip</div>
+    </div>
+    <div class="image-box slide-in-right">
+      <img src="{{ url_for('static', filename='images/road.jpg') }}" alt="Roadtrip">
+      <div class="label">Roadtrip</div>
+    </div>
+  </div>
+
+  <!-- Willkommensbox mit Button -->
+  <div class="welcome-box fade-in">
+    <h1>Die erste Reise planen</h1>
+    <p>Wähle dein Zielland und starte dein Abenteuer!</p>
+
+    <div class="unten_d">
+      <form action="{{ url_for('reisen.add') }}" method="get" class="land-auswahl-form">
+        <label for="zielland">Zielland auswählen:</label>
+        <select name="zielland" id="zielland" required>
+         <option value="">Bitte wählen</option>
   <option value="AD" data-name="Andorra">Andorra</option>
   <option value="AE" data-name="Vereinigte Arabische Emirate">Vereinigte Arabische Emirate</option>
   <option value="AF" data-name="Afghanistan">Afghanistan</option>
@@ -223,12 +275,13 @@
   <option value="VN" data-name="Vietnam">Vietnam</option>
   <option value="ZW" data-name="Zimbabwe">Zimbabwe</option>
 </select>
-  <input type="hidden" name="zielland_name" id="zielland_name">
-    <button type="submit" class="button_p"><span>Neue Reise planen</span></button>
-  </form>
-</div>
+    <input type="hidden" name="zielland_name" id="zielland_name">
+        <button type="submit" class="button_p"><span>Neue Reise planen</span></button>
+      </form>
+    </div>
+  </div>
 
-<div class="space"></div>
+</div>
 
 <div id="toast" style="
     visibility: hidden;
@@ -271,118 +324,11 @@
 </div>
 
 <script>
-  const reisen = {{ reisen | tojson | safe }};
-
-  // 1. Klickbare Karten mit Daten-URLs
-  document.querySelectorAll('.card').forEach((card, index) => {
-    const url = card.getAttribute('data-url');
-    if (url) {
-      card.style.cursor = 'pointer'; 
-
-      card.addEventListener('click', () => {
-        window.location.href = url;
-      });
-
-      card.setAttribute('tabindex', '0');
-      card.setAttribute('role', 'link');
-
-      card.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          window.location.href = url;
-        }
-      });
-    }
-
-    // 2. Reise zu dieser Karte holen (gleicher Index wie Karte)
-    const reise = reisen[index];
-    if (!reise) return; // Sicherheit, falls mismatch
-
-    // 3. Flüge und Hotels aus der Reise holen
-    const fluege = reise.fluege || [];
-    const hotels = reise.hotels || [];
-
-    // 4. Flug-Infos im Karte anzeigen (hier nehmen wir an, es gibt ein div mit Klasse 'flugInfo' in der Karte)
-    const flugInfoEl = card.querySelector('#flugInfo');
-    if (flugInfoEl) {
-      if (fluege.length === 0) {
-        flugInfoEl.innerHTML = '✈️ Keine Flugdaten verfügbar.';
-      } else {
-        // Flüge sortieren (Hinflug vor Rückflug)
-        fluege.sort((a, b) => {
-          const aDate = new Date(a.itineraries[0].segments[0].departure.at);
-          const bDate = new Date(b.itineraries[0].segments[0].departure.at);
-          return aDate - bDate;
-        });
-
-        let flugPreis = 0;
-        let flugText = "";
-
-        const formatDate = (iso) =>
-          new Date(iso).toLocaleDateString("de-DE", {
-            weekday: "short",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
-
-        if (fluege.length >= 1) {
-          const hinflugSeg = fluege[0].itineraries[0].segments[0];
-          const hinflugPreis = parseFloat(fluege[0].price.grandTotal);
-          flugPreis += hinflugPreis;
-
-          flugText += `
-            🛫 <strong>Hinflug:</strong> ${formatDate(hinflugSeg.departure.at)}
-            von ${hinflugSeg.departure.iataCode} nach ${hinflugSeg.arrival.iataCode}<br>
-          `;
-
-          if (fluege.length >= 2) {
-            const rueckflugSeg = fluege[1].itineraries[0].segments[0];
-            const rueckflugPreis = parseFloat(fluege[1].price.grandTotal);
-            flugPreis += rueckflugPreis;
-
-            flugText += `
-              🛬 <strong>Rückflug:</strong> ${formatDate(rueckflugSeg.departure.at)}
-              von ${rueckflugSeg.departure.iataCode} nach ${rueckflugSeg.arrival.iataCode}<br>
-            `;
-          }
-        }
-
-        
-        flugInfoEl.innerHTML = flugText;
-      }
-    }
-
-    // 5. Hotelpreise berechnen und anzeigen (div mit id preisInfo in der Karte)
-    const preisInfoEl = card.querySelector('#preisInfo');
-    if (preisInfoEl) {
-      let hotelPreis = 0;
-      if (hotels.length > 0) {
-        hotelPreis = hotels.reduce((sum, h) => sum + parseFloat(h.price || 0), 0);
-      }
-
-      const flugPreis = fluege.reduce((sum, f) => sum + parseFloat(f.price.grandTotal || 0), 0);
-
-      const gesamt = flugPreis + hotelPreis;
-
-      const formatPreis = (preis) =>
-        preis.toLocaleString("de-DE", {
-          style: "currency",
-          currency: "EUR",
-        });
-
-      preisInfoEl.innerText = `✈️ Flugpreis: ${formatPreis(flugPreis)}\n🏨 Hotelpreis: ${formatPreis(hotelPreis)}\n🧳 Gesamtpreis: ${formatPreis(gesamt)}`;
-    }
-  });
-
-
-  document.getElementById("zielland").addEventListener("change", function() {
+  document.getElementById("zielland").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
     const name = selectedOption.getAttribute("data-name");
     document.getElementById("zielland_name").value = name || "";
   });
-
-
 
   function zeigeToast(message, dauer = 3000) {
     const toast = document.getElementById('toast');
@@ -391,23 +337,28 @@
     toast.style.opacity = '1';
 
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.visibility = 'hidden';
+      toast.style.opacity = '0';
+      toast.style.visibility = 'hidden';
     }, dauer);
-}
+  }
 
-function zeigeToastError(message, dauer = 3000) {
+  function zeigeToastError(message, dauer = 3000) {
     const toast = document.getElementById('toast-error');
     toast.textContent = message;
     toast.style.visibility = 'visible';
     toast.style.opacity = '1';
 
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.visibility = 'hidden';
+      toast.style.opacity = '0';
+      toast.style.visibility = 'hidden';
     }, dauer);
-}
+  }
+
+  window.addEventListener("load", () => {
+  setTimeout(() => document.getElementById('img1').classList.add('visible'), 300);
+  setTimeout(() => document.getElementById('img2').classList.add('visible'), 700);
+  setTimeout(() => document.getElementById('img3').classList.add('visible'), 1100);
+  setTimeout(() => document.getElementById('welcomeBox').classList.add('visible'), 1800);
+});
 </script>
-
-
 {% endblock %}

@@ -27,14 +27,24 @@ def dashboard():
     ]
     return render_template('dashboard.html', reisen=user_reisen)
 
+@reisen_bp.route("/initial_dashboard")
+@login_required
+def initial_dashboard():
+    return render_template('initial_dashboard.html')
+
+@reisen_bp.route("/impressum")
+def impressum():
+    return render_template("impressum.html")
+
 @reisen_bp.route("/add")
 @login_required
 def add():
     zielland = request.args.get("zielland", None)
+    zielland_name = request.args.get("zielland_name", None)
     if not zielland:
         flash("Bitte wählen Sie ein Zielland aus.", "warning")
         return redirect(url_for("reisen.index"))
-    return render_template("reiseverwaltung.html", zielland=zielland)
+    return render_template("reiseverwaltung.html", zielland=zielland, zielland_name=zielland_name)
 
 @reisen_bp.route("/ergebnisse", methods=["GET", "POST"])
 @login_required
@@ -42,6 +52,7 @@ def ergebnisse():
     if request.method == "POST":
         reiseart = request.form.get('reiseart', '').strip().lower()
         zielland = request.form.get('zielland')
+        zielland_name = request.form.get('zielland_name')
         anreise = request.form.get('anreise')
         abreise = request.form.get('abreise')
 
@@ -135,6 +146,7 @@ def ergebnisse():
         session['reise_daten'] = {
             'reiseart': reiseart,
             'zielland': zielland,
+            "zielland_name": zielland_name,
             'anreise': anreise,
             'abreise': abreise,
             'zielort': korrigierter_zielort,
@@ -159,7 +171,6 @@ def ergebnisse():
         return render_template(template_name, reisedaten=session['reise_daten'])
 
     else:
-        # GET: Falls Daten in Session sind, zeige zum Bearbeiten, sonst Formularseite
         if 'reise_daten' in session:
             reisedaten = session['reise_daten']
             template_name = {
@@ -181,6 +192,7 @@ def ergebnisse():
 def reise_speichern():
     zielort = request.form.get('zielort')
     zielland = request.form.get('zielland')
+    zielland_name = request.form.get('zielland_name')
     zielort_plz = request.form.get('zielort_plz')
     reiseart = request.form.get('reiseart') 
     anreise = request.form.get('anreise')
@@ -190,6 +202,7 @@ def reise_speichern():
         "user_id": current_user.id,
         "zielort": zielort,
         "zielland": zielland,
+        "zielland_name": zielland_name,
         "zielort_plz": zielort_plz,
         "reiseart": reiseart,
         "anreise": anreise,
@@ -211,16 +224,21 @@ def reise_speichern():
         reise["sehenswuerdigkeiten"] = sehenswuerdigkeiten
 
     elif reiseart == "badeurlaub":
-        hotel = request.form.get('hotel')
-        fluege_json = request.form.get('fluege')  # <-- Hier richtiges Feld abfragen
-        if hotel:
-            reise["hotel"] = hotel
+        hotel_json = request.form.get('hotel')
+        if hotel_json:
+            try:
+                hotels = json.loads(hotel_json)
+                reise["hotels"] = hotels
+            except Exception as e:
+                print("Hotel-JSON konnte nicht geladen werden:", e)
+                reise["hotels"] = []
+        fluege_json = request.form.get('fluege') 
         if fluege_json:
             try:
-                fluege = json.loads(fluege_json)  # JSON in Python-Liste/Dict umwandeln
+                fluege = json.loads(fluege_json)
                 reise["fluege"] = fluege
             except Exception:
-                reise["fluege"] = []  # oder Fehlerbehandlung
+                reise["fluege"] = []
 
     else:
         return "Unbekannte Reiseart", 400
@@ -286,12 +304,12 @@ def anzeigen(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
     
     stopps = reise.get("stopps")
@@ -313,12 +331,12 @@ def anzeigen_staedtetrip(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise_ID", "danger")
+        flash("Ungültige Reise_ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dahboard'))
     
     sehenswuerdigkeiten = reise.get("sehenswuerdigkeiten")
@@ -339,12 +357,12 @@ def anzeigen_badeurlaub(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise_ID", "danger")
+        flash("Ungültige Reise_ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dahboard'))
     
     return render_template("anzeigen_badeurlaub.html", reise=reise, reise_id=oid)
@@ -355,12 +373,12 @@ def edit(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("bearbeiten.html", reise=reise)
@@ -371,12 +389,12 @@ def edit_staedtetrip(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
     
     return render_template("/bearbeiten_staedtetrip.html", reise=reise)
@@ -387,12 +405,12 @@ def edit_badeurlaub(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
     
     return render_template("/bearbeiten_badeurlaub.html", reise=reise)
@@ -403,12 +421,12 @@ def hinzufuegen_stopp(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("hinzufuegen_stopp.html", reise=reise)
@@ -472,12 +490,12 @@ def hinzufuegen_hotel(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("hinzufuegen_hotel.html", reise=reise)
@@ -485,11 +503,33 @@ def hinzufuegen_hotel(reise_id):
 @reisen_bp.route('/reisen/<reise_id>/hotels', methods=['POST'])
 def add_hotel_to_reise(reise_id):
     hotel = request.json
+
+    if 'id' not in hotel:
+        hotel['id'] = str(ObjectId())
+
     db.reisen.update_one(
         {'_id': ObjectId(reise_id)},
         {'$push': {'hotels': hotel}}
     )
-    return jsonify({"message": "Hotel hinzugefügt"}), 201
+    return jsonify({"message": "Hotel hinzugefügt", "id": hotel['id']}), 201
+
+@reisen_bp.route('/reise/<reise_id>/remove_hotel/<hotel_id>', methods=['DELETE'])
+@login_required
+def remove_hotel(reise_id, hotel_id):
+    try:
+        oid = ObjectId(reise_id)
+    except Exception:
+        return jsonify({"error": "Ungültige Reise-ID"}), 400
+
+    result = db.reisen.update_one(
+        {'_id': oid},
+        {'$pull': {'hotels': {'id': hotel_id}}}
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Hotel nicht gefunden"}), 404
+
+    return jsonify({"message": "Hotel entfernt"}), 200
 
 @reisen_bp.route('/reisen/<reise_id>')
 def show_reise_details(reise_id):
@@ -506,12 +546,12 @@ def hinzufuegen_flug(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("hinzufuegen_flug.html", reise=reise)
@@ -522,12 +562,12 @@ def hinzufuegen_auto(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("hinzufuegen_auto.html", reise=reise)
@@ -583,12 +623,12 @@ def hinzufuegen_stopp_staedtetrip(reise_id):
     try:
         oid = ObjectId(reise_id)
     except Exception:
-        flash("Ungültige Reise-ID", "danger")
+        flash("Ungültige Reise-ID", "error")
         return redirect(url_for('reisen.dashboard'))
     
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
-        flash("Reise nicht gefunden", "danger")
+        flash("Reise nicht gefunden", "error")
         return redirect(url_for('reisen.dashboard'))
    
     return render_template("hinzufuegen_stopp_staedtetrip.html", reise=reise)
@@ -666,10 +706,15 @@ def bearbeiten_staedtetrip(reise_id):
         update_data['stopps'] = data['stopps']
     if 'fluege' in data:
         update_data['fluege'] = data['fluege']
+    if 'hotels' in data:
+        update_data['hotels'] = data['hotels']
 
     result = reisen.update_one({'_id': oid}, {'$set': update_data})
 
-    return jsonify({'message': 'Reise aktualisiert'})
+    if result.modified_count == 1:
+        return jsonify({'message': 'Reise erfolgreich aktualisiert'})
+    else:
+        return jsonify({'message': 'Keine Änderungen vorgenommen'}), 200
 
 
 

@@ -1,14 +1,8 @@
-import flask
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, render_template_string, jsonify
+from flask import Flask, render_template
 from flask_bcrypt import Bcrypt
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from bson.json_util import dumps
+from flask_login import LoginManager
 from pymongo import MongoClient
-from bson.objectid import ObjectId
-import json
-from flask_assets import Environment, Bundle
-import requests
-import os
+from flask_assets import Environment
 
 API_KEY = "Gsbuy4IeGweWPquMj4z8i8sISSjGli2z"
 API_SECRET = "75Ocnq4Z3Fn7ExTc"
@@ -18,7 +12,7 @@ GOOGLE_API_KEY = "AIzaSyClEWrPjwpVkTYTXU2yhI2AN7QJ1LYGzHM"
 app = Flask(__name__)
 app.secret_key = "geheimes_token"
 
-client = MongoClient("mongodb+srv://TestUser:<Kovk53DlSe0lxSSK>@reiseplaner.sj6kir6.mongodb.net/?retryWrites=true&w=majority&appName=Reiseplaner")
+client = MongoClient("mongodb+srv://TestUser:Kovk53DlSe0lxSSK@reiseplaner.sj6kir6.mongodb.net/?retryWrites=true&w=majority&appName=Reiseplaner")
 db = client["reiseplaner"]
 users = db["users"]
 reisen = db["reisen"]
@@ -44,7 +38,6 @@ for rule in app.url_map.iter_rules():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
 
 
    

@@ -3,7 +3,7 @@
 {% block title %}Reise anzeigen{% endblock %}
 
 {% block body %}
-    <h2>{{ reise.reiseart | default('Keine Reiseart angegeben') | title }} nach {{ reise.zielland }}</h2>
+    <h2>Reise bearbeiten</h2>
 
     <div class="oben-b">
     <h4><strong>Reisedaten</strong></h4>
@@ -15,7 +15,7 @@
         <input type="date" id="abreise" name="abreise" value="{{ reise.abreise }}" style="width: 16vw;">
         </form>
 
-    <p><strong>Zielland</strong>: {{ reise.zielland }}</p>
+    <p><strong>Zielland</strong>: {{ reise.zielland_name }}</p>
 
      <div class="bearbeiten-links" style="height: 5vh;">
     <a class="link-b" href="{{ url_for('reisen.hinzufuegen_hotel', reise_id=reise._id) }}"><i class="fas fa-plus-circle"></i> Hotel hinzufügen</a>
@@ -25,7 +25,7 @@
     <div class="info-Hotel-Flug">
             {% if reise.fluege and reise.fluege | length >= 1 %}
             <div>
-                <h6><strong>✈️ Flugdetails</strong></h6>
+                <h4><strong>✈️ Flugdetails</strong></h4>
                 <p id="flugInfo">Lade Fluginformationen...</p>
             </div>
             {% else %}
@@ -34,7 +34,7 @@
 
             {% if reise.hotels and reise.hotels | length > 0 %}
             <div>
-                <h6><strong>🏨 Hotels</strong></h6>
+                <h4><strong>🏨 Hotels</strong></h4>
                 <ul>
                 {% for hotel in reise.hotels %}
                     <li>
@@ -141,16 +141,19 @@ function zeigeFluege() {
         flugPreis += preis;
 
         flugText += `
-            ✈️ <strong>${index === 0 ? "Hinflug" : "Rückflug"}:</strong> ${formatDate(seg.departure.at)}
+            🛫 <strong>${index === 0 ? "Hinflug" : "Rückflug"}:</strong> ${formatDate(seg.departure.at)}
             von ${seg.departure.iataCode} nach ${seg.arrival.iataCode}<br>
-            <small>Preis: ${preis.toFixed(2)} EUR</small><br>
-            <button class="entfernen-button" onclick="entferneFlug(${index})">🗑️ Entfernen</button>
+            <small>Preis: ${preis.toFixed(2)} EUR</small>
+            <button class="entfernen-button" onclick="entferneFlug(${index})">🗑️</button>
             <hr>
         `;
     });
 
-    document.getElementById("flugInfo").innerHTML = flugText;
-}
+    const flugBox = document.getElementById("flug-box");
+    if (flugBox) {
+    flugBox.innerHTML = flugText;
+    }
+    }
 
 
 

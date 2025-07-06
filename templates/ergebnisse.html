@@ -3,57 +3,80 @@
 {% block title %}Reiseplan{% endblock %}
 
 {% block body %}
-<h1>{{ reisedaten.reisearten | join(', ') }} in {{ reisedaten.zielland }} von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h1>
+<h1>{{ reisedaten.reiseart | default('Keine Reiseart angegeben') | title }} in {{ reisedaten.zielland_name }}</h1>
+<h5>von {{ reisedaten.anreise or "?" }} bis {{ reisedaten.abreise or "?" }}</h5>
 
 <div class="hauptbereich">
     <div class="oben_e">
-   <div style="display: flex; height: 80vh; width: 100vw;">
+   <div style="display: flex; height: 77vh; width: 100vw;">
     <!-- Karte links -->
-    <div class="karte" id="karte" style="flex: 2; min-width: 0;"></div>
+    <div class="karte" id="karte" style="height: 100%; min-height: 800px; flex: 2; min-width: 0;"></div>
 
     <!-- Rechte Seite: flex-Container mit Spalte -->
     <div style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; min-width: 0;">
         <!-- Info oben -->
-        <div class="info" style="flex: 1; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; min-height: 0;">
-            <!-- Detailcontainer hier rein -->
-            <div id="detail-container">
-                <div id="detail-karte" style="height: 300px; margin-bottom: 10px;"></div>
-                <div id="detail-info"></div>
-                <div style="margin-top: 10px; text-align: center;">
-                    <button id="btn-zurueck" class="button" style="margin-right: 10px; border-radius: 6px;">Zurück</button>
-                    <button id="btn-weiter" class="button">Weiter</button>
-                </div>
-            </div>
-        </div>
+         <div id="routen-info" style="font-weight: bold; margin-bottom: 10px;"></div>
+         <!-- Infokarten-Bereich -->
+    <div id="infos-container-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; border-radius: 12px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-left: 150px; margin-bottom: 10px; width: 100%; max-width: 300px; margin-top: 8px;">
+      <button id="btnZurueck" onclick="zeigeVorigeKarte()" class="info-nav-btn"><span>←</span></button>
+      <button id="btnWeiter" onclick="zeigeNaechsteKarte()" class="info-nav-btn"><span>→</span></button>
+    </div>
+    <div id="info-karte"
+      style="flex: 1; overflow-y: auto; padding: 10px; border-radius: 12px; min-height: 0; scrollbar-width: thin;">
+    </div>
+ 
+    </div>
 
         <!-- Stopps-Liste unten -->
-        <div id="stopp-liste-container" style="flex: 0 0 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; margin-top: 10px;">
+    <div style="margin-top: 20px; margin-bottom: 8px;">
+            <div class="hinzufuegen-stopp" style="display: flex;">
+            <div class="autocomplete-wrapper" style="position: relative;">
+                <input type="text" id="stopp" name="zielort" placeholder="Stopp hinzufügen..." autocomplete="off" required>
+                <ul id="autocomplete-list" class="autocomplete-list"></ul>
+            </div>
+             <button class="button-l" onclick="neuenStoppHinzufuegen()" style="margin-left: 5px;"><span>🔍</span></button>
+            <div id="stopp-tags"></div>
+                <input type="hidden" id="stopp-hidden" name="stopps">
+            </div>
+        <div id="stopp-liste-container" style="flex: 0 0 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; margin-top: 10px; scrollbar-width: thin;">
             <h3>Stopps sortieren</h3>
             <ul id="stopp-liste" style="list-style-type: none; padding-left: 0; margin: 0;"></ul>
         </div>
     </div>
+    </div>
 </div>
 </div>
+<div id="lade-box" style="
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  z-index: 9999;
+  width: 240px;
+  font-family: sans-serif;
 
-    <div class="unten_a">
-             <label for="stopp">Stopp eingeben (PLZ oder Ort):</label>
-            <div class="hinzufuegen-stopp">
-            <div class="autocomplete-wrapper" style="position: relative;">
-                <input type="text" id="stopp" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required style="width: 14vw;">
-                <ul id="autocomplete-list" class="autocomplete-list"></ul>
-            </div>
-            <div id="stopp-tags"></div>
-                <input type="hidden" id="stopp-hidden" name="stopps">
-            </div>
-        </div>
-        <button class="button" onclick="neuenStoppHinzufuegen()"><span>🔍</span></button>
-
-    <form action="{{ url_for('reisen.reise_speichern') }}" method="POST">
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+">
+  <div id="car-animation" style="width: 180px; height: 180px;"></div>
+  <div style="margin-top: 5px; font-size: 1rem; color: #444;"><strong>Route wird berechnet...</strong></div>
+</div>
+     
+<form action="{{ url_for('reisen.reise_speichern') }}" method="POST">
     <input type="hidden" name="zielort" value="{{ reisedaten.zielort }}">
     <input type="hidden" name="zielort_plz" value="{{ reisedaten.zielort_plz }}">
     <input type="hidden" name="anreise" value="{{ reisedaten.anreise }}">
     <input type="hidden" name="abreise" value="{{ reisedaten.abreise }}">
     <input type="hidden" name="zielland" value="{{ reisedaten.zielland }}">
+    <input type="hidden" name="zielland_name" value="{{ reisedaten.zielland_name }}">
 
     <input type="hidden" name="reiseart" value="{{ reisedaten.reiseart }}">
 
@@ -65,8 +88,10 @@
         <button class="button" type="submit"><span>Reise speichern</span></button>
     </div>
     </form>
-    </div>
 </div>
+
+<div class="space"></div>
+
 
 <div id="toast" style="
     visibility: hidden;
@@ -121,6 +146,8 @@
     let initialMarker = [];
     let routeLinie = null;
 
+    let carAnimation;
+
     document.addEventListener("DOMContentLoaded", function () {
         console.log("DOM fully loaded and parsed")
         karte = L.map('karte').setView([51.1657, 10.4515], 6);
@@ -128,10 +155,21 @@
             attribution: '© OpenStreetMap-Mitwirkende'
         }).addTo(karte);
 
+      carAnimation = lottie.loadAnimation({
+          container: document.getElementById('car-animation'),
+          renderer: 'svg',
+          loop: true,
+          autoplay: true,
+          path: '/static/animations/car-animation.json'
+        });
+
         ladeUndZeigeRoute();
 
        karte?.on('click', async function (e) {
     let latlng = e.latlng;
+
+  document.getElementById('lade-box').style.display = "none";
+
 
     // Reverse Geocoding (Nominatim)
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
@@ -150,41 +188,19 @@
 
     });
 
+function zeigeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "flex";
+  carAnimation.play();
+}
 
-    async function ladeUndZeigeRoute() {
-        for (let ort of orte) {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
-            const daten = await res.json();
-            if (daten.length > 0) {
-                let lat = parseFloat(daten[0].lat);
-                let lon = parseFloat(daten[0].lon);
-                let marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
-                initialMarker.push(marker);
-                initialPunkte.push([lat, lon]);
-            }
-        }
-        punkte = [...initialPunkte];
-        markerListe = [...initialMarker];
-        zeichneRoute();
+function versteckeLadeanimation() {
+  const ladeBox = document.getElementById("lade-box");
+  ladeBox.style.display = "none";
+  carAnimation.pause();
+}
 
-
-        await zeigeInfosZuOrten();
-        aktualisiereStoppListe();
-    }
-
-
-    function zeichneRoute() {
-        if (routeLinie) {
-            karte.removeLayer(routeLinie);
-        }
-        if (punkte.length > 1) {
-            routeLinie = L.polyline(punkte, { color: 'blue' }).addTo(karte);
-            karte.fitBounds(routeLinie.getBounds());
-        }
-    }
-
-
-    const stoppInput = document.getElementById("stopp");
+const stoppInput = document.getElementById("stopp");
 const autocompleteList = document.getElementById("autocomplete-list");
 
 stoppInput.addEventListener("input", async () => {
@@ -194,7 +210,6 @@ stoppInput.addEventListener("input", async () => {
     return;
   }
 
-  // Hole Vorschläge von deiner Flask-Route
   const response = await fetch(`/autocomplete_ort?q=${encodeURIComponent(query)}&country=${country}`);
   const data = await response.json();
 
@@ -214,7 +229,6 @@ stoppInput.addEventListener("input", async () => {
   });
 });
 
-// Angepasste Funktion: Ort über Nominatim holen, Marker setzen etc.
 async function neuenStoppHinzufuegen(ort) {
   if (!ort) ort = stoppInput.value.trim();
   if (!ort) return zeigeToastError("Bitte einen Ort eingeben.");
@@ -231,134 +245,182 @@ async function neuenStoppHinzufuegen(ort) {
     punkte.push([lat, lon]);
     orte.push(ort);
     aktualisiereStoppListe();
-    zeigeInfosZuOrten();
     await ladeUndZeigeRoute();
     document.getElementById("stopp").value = "";
   } else {
-    alert("Ort nicht gefunden.");
+    zeigeToastError("Ort nicht gefunden.");
   }
 }
 
 
-    async function ladeUndZeigeRoute() {
-    initialPunkte.length = 0;  // sicherheitshalber leeren
+async function ladeUndZeigeRoute() {
+let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+
+  try {
+    zeigeLadeanimation();
+
+    initialPunkte.length = 0;
     initialMarker.length = 0;
 
     for (let i = 0; i < orte.length; i++) {
-        const ort = orte[i];
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
-        const daten = await res.json();
-        if (daten.length > 0) {
-            let lat = parseFloat(daten[0].lat);
-            let lon = parseFloat(daten[0].lon);
+      const ort = orte[i];
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
+      
+      if (!res.ok) throw new Error("Fehler bei Geodaten-Antwort");
 
-            let marker;
-            if (i === orte.length - 1) {
-                marker = L.marker([lat, lon], {
-                    icon: L.icon({
-                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 30],
-                        popupAnchor: [0, -30]
-                    })
-                }).addTo(karte).bindPopup(ort + " (Ziel)");
-            } else {
-                marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
-            }
+      const daten = await res.json();
 
-            initialMarker.push(marker);
-            initialPunkte.push([lat, lon]);
+      if (daten.length > 0) {
+        let lat = parseFloat(daten[0].lat);
+        let lon = parseFloat(daten[0].lon);
+
+        let marker;
+        if (i === orte.length - 1) {
+          marker = L.marker([lat, lon], {
+            icon: L.icon({
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+              iconSize: [30, 30],
+              iconAnchor: [15, 30],
+              popupAnchor: [0, -30]
+            })
+          }).addTo(karte).bindPopup(ort + " (Ziel)");
+        } else {
+          marker = L.marker([lat, lon]).addTo(karte).bindPopup(ort);
         }
+
+        initialMarker.push(marker);
+        initialPunkte.push([lat, lon]);
+      }
     }
 
     punkte = [...initialPunkte];
     markerListe = [...initialMarker];
 
-    await zeichneRoute();  // Route zeichnen
-
+    await zeichneRoute();
     await zeigeInfosZuOrten();
     aktualisiereStoppListe();
+  } catch (err) {
+    console.error("Fehler beim Laden der Route:", err);
+    zeigeToastError("Fehler beim Laden der Route.");
+    infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await ladeUndZeigeRoute(); 
+          retryBtn.disabled = false;
+        });
+  } finally {
+    versteckeLadeanimation();
+    
+  }
 }
 
-async function zeichneRoute() {
-    if (punkte.length <= 1) return;
 
+
+async function zeichneRoute() {
+
+  let infoBox = document.getElementById("routen-info");
+  if (!infoBox) {
+      infoBox = document.createElement("div");
+      infoBox.id = "routen-info";
+      infoBox.style.marginTop = "10px";
+      infoBox.style.fontWeight = "bold";
+      infoBox.style.fontSize = "1rem";
+      document.querySelector(".info")?.prepend(infoBox);
+  }
+  
+  if (punkte.length <= 1) {
+    return;
+  }
+
+
+  setTimeout(async () => {
     if (routeLinie) karte.removeLayer(routeLinie);
 
     const body = {
-        coordinates: punkte.map(p => [p[1], p[0]]), // hier tauschen wir lat/lon zu lon/lat
+        coordinates: punkte.map(p => [p[1], p[0]]),
         format: "geojson"
     };
 
-    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-        method: 'POST',
-        headers: {
-            'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
+    try {
+        const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+            method: 'POST',
+            headers: {
+                'Authorization': '5b3ce3597851110001cf624816c4af7ed92a44f3ace4a12340d7cb71',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
 
-    if (!res.ok) {
-        const error = await res.json();
-        console.error("Fehler bei der Routenabfrage:", error);
-        alert("Fehler bei der Routenabfrage: " + (error.error?.message || res.statusText));
-        return;
-    }
-
-    const data = await res.json();
-
-    routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
-    karte.fitBounds(routeLinie.getBounds());
-
-    const summary = data.features?.[0]?.properties?.summary;
-    if (summary) {
-        const distKm = (summary.distance / 1000).toFixed(1);
-        const dauerMin = Math.round(summary.duration / 60);
-        const std = Math.floor(dauerMin / 60);
-        const min = dauerMin % 60;
-
-        let infoBox = document.getElementById("routen-info");
-        if (!infoBox) {
-            infoBox = document.createElement("div");
-            infoBox.id = "routen-info";
-            infoBox.style.marginTop = "10px";
-            infoBox.style.fontWeight = "bold";
-            infoBox.style.fontSize = "1rem";
-            document.querySelector(".info")?.prepend(infoBox);
+        if (!res.ok) {
+            throw new Error(`Routing fehlgeschlagen (Status ${res.status})`);
         }
-        infoBox.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
+
+        const data = await res.json();
+
+        routeLinie = L.geoJSON(data, { style: { color: 'red' } }).addTo(karte);
+        karte.fitBounds(routeLinie.getBounds());
+
+        const summary = data.features?.[0]?.properties?.summary;
+        if (summary) {
+            const distKm = (summary.distance / 1000).toFixed(1);
+            const dauerMin = Math.round(summary.duration / 60);
+            const std = Math.floor(dauerMin / 60);
+            const min = dauerMin % 60;
+
+            infoBox.textContent = `Gesamtdistanz: ${distKm} km – Fahrzeit: ${std}h ${min}min`;
+        }
+
+    } catch (err) {
+        console.error(err);
+
+        zeigeToastError("Routing fehlgeschlagen. Bitte versuche es später erneut.");
+        infoBox.innerHTML = `
+          Routing fehlgeschlagen. Bitte versuche es später erneut. 
+          <button class="button" id="retry-btn"><span>Retry</span></button>
+        `;
+        const retryBtn = document.getElementById("retry-btn");
+        retryBtn.addEventListener("click", async () => {
+          retryBtn.disabled = true;
+          infoBox.textContent = "Bitte warten...";
+          await zeichneRoute(); 
+          retryBtn.disabled = false;
+        });
+        throw err;
     }
+  }, 50);
 }
 
 
+async function ladeWikiInfo(ort) {
+  const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(ort)}`;
 
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Wiki nicht gefunden");
+    const daten = await res.json();
 
-    async function ladeWikiInfo(ort) {
-    // PLZ (4-5 Ziffern + Leerzeichen) entfernen
-    const ortOhnePLZ = ort.replace(/^\d{4,5}\s+/, '').trim();
-
-    const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(ortOhnePLZ)}`;
-
-    try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Fehler beim Laden von Wikipedia: ${res.status}`);
-        const data = await res.json();
-
-        if (data.title && data.extract) {
-            return {
-                title: data.title,
-                extract: data.extract,
-                thumbnail: data.thumbnail?.source || null,
-                pageUrl: `https://de.wikipedia.org/wiki/${encodeURIComponent(data.title)}`
-            };
-        } else {
-            return null;
-        }
-    } catch (err) {
-        console.warn(`Keine Wikipedia-Info für ${ortOhnePLZ}: ${err}`);
-        return null;
-    }
+    return {
+      title: daten.title || stichwort,
+      extract: daten.extract || "Keine Beschreibung gefunden.",
+      thumbnail: daten.thumbnail?.source || null,
+      pageUrl: daten.content_urls?.desktop?.page || "#"
+    };
+  } catch {
+    return null;
+  }
 }
 
 
@@ -394,40 +456,22 @@ async function zeichneRoute() {
         }
     }
 
-    let aktuelleInfoIndex = 0;
-    let infoDivs = [];
+let aktuelleKarteIndex = 0;
+let infoKarten = [];
 
-    async function zeigeInfosZuOrten() {
-    const infoContainer = document.querySelector('.info');
-    infoContainer.innerHTML = ''; 
+async function zeigeInfosZuOrten() {
+  const orteOhnePlz = orte.map(ort => ort.replace(/^\d+\s*/, ""));
 
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.margin = "10px 0";
-    buttonContainer.style.textAlign = "center";
+  infoKarten = [];
 
-    const btnPrev = document.createElement('button');
-    btnPrev.textContent = "← Zurück";
-    btnPrev.disabled = true;
-    btnPrev.classList.add("nav-button");
-
-    const btnNext = document.createElement('button');
-    btnNext.textContent = "Weiter →";
-    btnNext.disabled = true;
-    btnNext.classList.add("nav-button");
-
-    const btnGroup = document.createElement('div');
+  const btnGroup = document.createElement('div');
     btnGroup.style.marginTop = "10px";
-    btnGroup.classList.add('ort-button-container');
+    btnGroup.classList.add('stopp-button-container');
 
-    infoDivs = [];
+  for (const ort of orteOhnePlz) {
+    const wikiInfo = await ladeWikiInfo(ort);
 
-    for (let i = 0; i < orte.length; i++) {
-        const ort = orte[i];
-        const ortOhnePLZ = ort.replace(/^\d{4,5}\s+/, '').trim();
-
-        const wikiInfo = await ladeWikiInfo(ort);
-
-        let lat, lon;
+let lat, lon;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ort)}`);
             const daten = await res.json();
@@ -445,73 +489,69 @@ async function zeichneRoute() {
 
         const pois = await holeSehenswuerdigkeiten(lat, lon);
 
-        const ortDiv = document.createElement('div');
-        ortDiv.classList.add('detail-box');
+    const karteDiv = document.createElement('div');
+    karteDiv.classList.add('detail-box');
 
-        if (wikiInfo) {
-            ortDiv.innerHTML += `
-                <h3>Info zu ${wikiInfo.title}</h3>
-                ${wikiInfo.thumbnail ? `<img src="${wikiInfo.thumbnail}" alt="${wikiInfo.title}" style="max-width:100px; float:left; margin-right:10px;">` : ''}
-                <p>${wikiInfo.extract}</p>
-                <a href="${wikiInfo.pageUrl}" target="_blank">Mehr lesen</a>
-                <div style="clear: both;"></div>
-            `;
-        } else {
-            ortDiv.innerHTML += `<h3>Keine Wikipedia-Info für ${ortOhnePLZ} gefunden.</h3>`;
-        }
+    if (wikiInfo) {
+      karteDiv.innerHTML = `
+        <h3>Info zu ${wikiInfo.title}</h3>
+        ${wikiInfo.thumbnail ? `<img src="${wikiInfo.thumbnail}" alt="${wikiInfo.title}" style="max-width:100px; float:left; margin-right:10px;">` : ''}
+        <p>${wikiInfo.extract}</p>
+        <a href="${wikiInfo.pageUrl}" target="_blank">Mehr lesen</a>
+        <div style="clear: both;"></div>
+      `;
+    } else {
+      karteDiv.innerHTML = `<h3>Keine Wikipedia-Info für "${ort}" gefunden.</h3>`;
+    }
 
-        if (pois.length > 0) {
-            ortDiv.innerHTML += `<h4>Sehenswürdigkeiten in der Nähe von ${ortOhnePLZ}:</h4><ul style="margin-left: 1em; padding-left: 1em; list-style-type: disc;">`;
+if (pois.length > 0) {
+            karteDiv.innerHTML += `<h4>Sehenswürdigkeiten in der Nähe von ${ort}:</h4><ul style="margin-left: 1rem; padding-left: 1rem; list-style-type: disc;">`;
             pois.forEach(poi => {
                 const name = poi.tags?.name || `POI ${poi.id}`;
-                ortDiv.innerHTML += `<li>${name}</li>`;
+                karteDiv.innerHTML += `<li style="margin-left: 8px">${name}</li>`;
             });
-            ortDiv.innerHTML += `</ul>`;
+            karteDiv.innerHTML += `</ul>`;
         } else {
-            ortDiv.innerHTML += `<p>Keine Sehenswürdigkeiten in der Nähe gefunden.</p>`;
+            karteDiv.innerHTML += `<p>Keine Sehenswürdigkeiten in der Nähe gefunden.</p>`;
         }
 
-        infoDivs.push(ortDiv);
-        infoContainer.appendChild(ortDiv);
+    infoKarten.push(karteDiv);
+  }
 
-        const btn = document.createElement('button');
-        btn.textContent = ortOhnePLZ;
-        btn.classList.add('ort-button');
+  const btn = document.createElement('button');
+        btn.textContent = orteOhnePlz;
+        btn.classList.add('stopp-button');
         btn.addEventListener('click', () => {
-            zeigeInfoIndex(i);
+            zeigeInfoIndex(aktuelleKarteIndex);
         });
         btnGroup.appendChild(btn);
-    }
 
-    buttonContainer.appendChild(btnPrev);
-    buttonContainer.appendChild(btnNext);
-    infoContainer.insertBefore(buttonContainer, infoContainer.firstChild);
-    infoContainer.appendChild(btnGroup);
 
-    btnPrev.addEventListener('click', () => {
-        if (aktuelleInfoIndex > 0) {
-            zeigeInfoIndex(aktuelleInfoIndex - 1);
-        }
-    });
-    btnNext.addEventListener('click', () => {
-        if (aktuelleInfoIndex < infoDivs.length - 1) {
-            zeigeInfoIndex(aktuelleInfoIndex + 1);
-        }
-    });
+  aktuelleKarteIndex = 0;
+  zeigeAktuelleKarte(); 
+}
 
-    if (infoDivs.length > 0) {
-        zeigeInfoIndex(0);
-    }
+function zeigeAktuelleKarte() {
+  const container = document.getElementById("info-karte");
+  container.innerHTML = '';
+  container.appendChild(infoKarten[aktuelleKarteIndex]);
 
-    function zeigeInfoIndex(index) {
-        infoDivs.forEach((div, i) => {
-            div.style.display = i === index ? "block" : "none";
-        });
-        aktuelleInfoIndex = index;
+  document.getElementById("btnZurueck").disabled = aktuelleKarteIndex === 0;
+  document.getElementById("btnWeiter").disabled = aktuelleKarteIndex === infoKarten.length - 1;
+}
 
-        btnPrev.disabled = index === 0;
-        btnNext.disabled = index === infoDivs.length - 1;
-    }
+function zeigeNaechsteKarte() {
+  if (aktuelleKarteIndex < infoKarten.length - 1) {
+    aktuelleKarteIndex++;
+    zeigeAktuelleKarte();
+  }
+}
+
+function zeigeVorigeKarte() {
+  if (aktuelleKarteIndex > 0) {
+    aktuelleKarteIndex--;
+    zeigeAktuelleKarte();
+  }
 }
 
 function aktualisiereStoppListe() {
@@ -533,11 +573,12 @@ function aktualisiereStoppListe() {
         name.textContent = ort;
 
         const btn = document.createElement("button");
-        btn.textContent = "✕";
+        btn.textContent = "✖";
+        btn.classList.add("entfernen-button");
         btn.style.marginLeft = "10px";
         btn.style.background = "transparent";
         btn.style.border = "none";
-        btn.style.color = "red";
+        btn.style.color = "#dc3545";
         btn.style.cursor = "pointer";
         btn.title = "Stopp entfernen";
 
@@ -546,7 +587,7 @@ function aktualisiereStoppListe() {
             punkte.splice(index, 1);
             karte.removeLayer(markerListe[index]);
             markerListe.splice(index, 1);
-            zeichneRoute();
+            ladeUndZeigeRoute();
             aktualisiereStoppListe();
             zeigeInfosZuOrten();
         };
@@ -603,6 +644,7 @@ document.querySelector('form').addEventListener('submit', (e) => {
         input.value = stoppName;
         form.appendChild(input);
     });
+    zeigeToast("Reise erfolgreich gespeichert!")
 });
 
 function zeigeToast(message, dauer = 3000) {
