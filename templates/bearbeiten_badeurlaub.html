@@ -105,8 +105,8 @@
 
 <script>
     const reiseId = "{{ reise._id or reise.id }}";
-    const fluege = {{ reise.fluege | default([]) | tojson | safe }};
-    const hotels = {{ reise.hotels | default([]) | tojson | safe }};
+    let fluege = {{ reise.fluege | default([], true) | tojson | safe}}
+    let hotels = {{ reise.hotels | default([], true) | tojson | safe}}
 
     
 document.querySelector('.bearbeiten-buttons button[type="submit"]').addEventListener('click', async (e) => {
@@ -220,7 +220,7 @@ function aktualisiereHotelListe() {
     row.classList.add('hotel-row');
 
     const nameSpan = document.createElement('span');
-    nameSpan.innerHTML = `<strong>${hotel.name}</strong> – ${hotel.price ?? ''} ${hotel.currency ?? ''}`;
+    nameSpan.innerHTML = `<strong>${hotel.name}</strong> - ${hotel.price ?? ''} ${hotel.currency ?? ''}`;
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'entfernen-button';

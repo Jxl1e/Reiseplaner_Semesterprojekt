@@ -376,25 +376,32 @@ function aktualisiereStoppListe() {
         span.textContent = ort;
         span.style.cursor = "grab";
 
-        const btnEntfernen = document.createElement("button");
-        btnEntfernen.textContent = "✖";
-        btnEntfernen.classList.add("entfernen-button");
-        btnEntfernen.style.color = "#dc3545";
-        btnEntfernen.title = "Stopp entfernen";
-        btnEntfernen.style.marginLeft = "10px";
-        btnEntfernen.style.border = "none";
-        btnEntfernen.style.background = "none"
-        btnEntfernen.addEventListener("click", () => {
-            orte.splice(index, 1);
-            punkte.splice(index, 1);
-            karte.removeLayer(markerListe[index]);
-            markerListe.splice(index, 1);
-            aktualisiereStoppListe();
-            zeichneRoute();
-        });
+       li.appendChild(span);
 
-        li.appendChild(span);
-        li.appendChild(btnEntfernen);
+if (index !== orte.length - 1) {
+    const btnEntfernen = document.createElement("button");
+    btnEntfernen.textContent = "✖";
+    btnEntfernen.classList.add("entfernen-button");
+    btnEntfernen.style.color = "#dc3545";
+    btnEntfernen.title = "Stopp entfernen";
+    btnEntfernen.style.marginLeft = "10px";
+    btnEntfernen.style.border = "none";
+    btnEntfernen.style.background = "none";
+    btnEntfernen.addEventListener("click", () => {
+        orte.splice(index, 1);
+        punkte.splice(index, 1);
+        karte.removeLayer(markerListe[index]);
+        markerListe.splice(index, 1);
+        aktualisiereStoppListe();
+        zeichneRoute();
+    });
+
+    li.appendChild(btnEntfernen);
+} else {
+    span.style.fontWeight = "bold";
+    span.style.color = "#2c3e50";
+    span.title = "Zielort – kann nicht entfernt werden";
+}
         li.setAttribute("data-index", index);
 
         liste.appendChild(li);
@@ -405,29 +412,50 @@ function aktualisiereStoppListe() {
     }
 
     liste._sortable = Sortable.create(liste, {
-        animation: 150,
-        onEnd: function (evt) {
-            const altIndex = evt.oldIndex;
-            const neuIndex = evt.newIndex;
+    animation: 150,
 
-            const ort = orte.splice(altIndex, 1)[0];
-            orte.splice(neuIndex, 0, ort);
+    onMove: function (evt) {
+        const letzterIndex = orte.length - 1;
 
-            const punkt = punkte.splice(altIndex, 1)[0];
-            punkte.splice(neuIndex, 0, punkt);
-
-            markerListe.forEach(m => karte.removeLayer(m));
-            markerListe = [];
-
-            punkte.forEach((latlng, i) => {
-                const marker = L.marker(latlng).addTo(karte).bindPopup(orte[i]);
-                markerListe.push(marker);
-            });
-
-            zeichneRoute();
-            speichereStoppreihenfolge();
+        if (evt.dragged.dataset.index == letzterIndex) {
+            return false;
         }
-    });
+
+        if (evt.related && evt.related.dataset.index == letzterIndex && evt.willInsertAfter) {
+            return false;
+        }
+
+        return true;
+    },
+
+    onEnd: function (evt) {
+        const altIndex = evt.oldIndex;
+        const neuIndex = evt.newIndex;
+
+        const letzterIndex = orte.length - 1;
+
+        if (neuIndex >= letzterIndex) {
+            return aktualisiereStoppListe();
+        }
+
+        const ort = orte.splice(altIndex, 1)[0];
+        orte.splice(neuIndex, 0, ort);
+
+        const punkt = punkte.splice(altIndex, 1)[0];
+        punkte.splice(neuIndex, 0, punkt);
+
+        markerListe.forEach(m => karte.removeLayer(m));
+        markerListe = [];
+
+        punkte.forEach((latlng, i) => {
+            const marker = L.marker(latlng).addTo(karte).bindPopup(orte[i]);
+            markerListe.push(marker);
+        });
+
+        ladeUndZeigeRoute();
+        speichereStoppreihenfolge();
+    }
+});
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -436,6 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function speichereStoppreihenfolge() {
     try {
+      console.log("Zu speichernde Stopps:", orte);
         const response = await fetch(`/reise/${reiseId}/stopps`, {
             method: 'POST',
             headers: {
@@ -456,7 +485,7 @@ async function speichereStoppreihenfolge() {
 }
 document.getElementById('speichere-stopps').addEventListener('click', async () => {
     try {
-        // Speichere nur die Stoppreihenfolge
+            console.log("Zu speichernde Stopps:", orte);
         const response = await fetch(`/reise/${reiseId}/stopps`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

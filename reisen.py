@@ -592,6 +592,7 @@ def aktualisiere_stopps(reise_id):
         return jsonify({'message': 'Reise nicht gefunden'}), 404
 
     reisen.update_one({'_id': oid}, {'$set': {'stopps': neue_stopps}})
+    print("Neue Stopps gespeichert:", reisen.find_one({'_id': oid})['stopps'])
 
     return jsonify({'message': 'Stoppreihenfolge erfolgreich aktualisiert'})
 

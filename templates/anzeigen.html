@@ -131,7 +131,7 @@
 
 <script>
     let orte = {{ reise.stopps | default([], true) | tojson | safe }};
-    let zielort = {{ reise.zielort | default("", true) | tojson | safe }};
+    let zielort = orte.length > 0 ? orte[orte.length - 1] : null;
     const fluege = {{ reise.fluege | default([]) | tojson | safe }};
     const hotels = {{ reise.hotels | default([]) | tojson | safe }};
     let initialMarker = [];

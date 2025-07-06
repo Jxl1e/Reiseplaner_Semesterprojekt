@@ -19,7 +19,6 @@
                 <input type="text" id="stopp" name="zielort" placeholder="z.B. 10115 Berlin" autocomplete="off" required>
                 <ul id="autocomplete-list" class="autocomplete-list"></ul>
             </div>
-            <div id="stopp-tags"></div>
                 <input type="hidden" id="stopp-hidden" name="stopps">
             </div>
         
@@ -128,6 +127,10 @@
      if (zielort && !orte.includes(zielort)) {
         orte.push(zielort);
     }
+
+    document.addEventListener("DOMContentLoaded", function () {
+    initStopps();
+});
 
     karte = L.map('karte').setView([51.1657, 10.4515], 6);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -304,140 +307,171 @@ async function zeichneRoute() {
   }, 50);
 }
 
+  function speichereStoppreihenfolge() {
+    console.log("Reihenfolge gespeichert!");
+}
+
 
 function aktualisiereStoppListe() {
     const liste = document.getElementById("stopp-liste");
     console.log("Liste gefunden:", liste);
     liste.innerHTML = "";
 
-    orte.forEach((ort, index) => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-    ${ort}
-    <button style="float:right; background:none; border:none; color:red; cursor:pointer;" onclick="entferneStopp('${ort}')">✖</button>`;
+  orte.forEach((ort, index) => {
+      const li = document.createElement("li");
 
-        li.setAttribute("data-index", index);
-        li.style.padding = "5px 10px";
-        li.style.margin = "4px 0";
-        li.style.border = "1px solid #ccc";
-        li.style.borderRadius = "6px";
-        li.style.cursor = "grab";
-        liste.appendChild(li);
-    });
+      const istZielort = ort === zielort;
+
+      li.innerHTML = `
+          ${ort}
+          ${istZielort ? '' : `<button style="float:right; background:none; border:none; color:red; cursor:pointer;" onclick="entferneStopp('${ort}')">✖</button>`}
+      `;
+
+      li.setAttribute("data-index", index);
+      li.style.padding = "5px 10px";
+      li.style.margin = "4px 0";
+      li.style.border = "1px solid #ccc";
+      li.style.borderRadius = "6px";
+      li.style.cursor = istZielort ? "default" : "grab";
+      if (istZielort) {
+          li.innerHTML = `${ort} (Ziel)`;
+          li.style.backgroundColor = "#f9f9f9";
+      }
+
+      liste.appendChild(li);
+  });
 
     if (liste._sortable) {
         liste._sortable.destroy();  
     }
 
     liste._sortable = Sortable.create(liste, {
-        animation: 150,
-        onEnd: function (evt) {
-            const altIndex = evt.oldIndex;
-            const neuIndex = evt.newIndex;
+    animation: 150,
+    filter: "li:last-child", // Letzter Eintrag ist Zielort und nicht bewegbar
+    onMove: function (evt) {
+        // Zielort (letztes Element) darf nicht bewegt werden
+        return evt.related !== evt.dragged;
+    },
+    onEnd: function (evt) {
+        // Zielort darf nie bewegt werden – abbrechen wenn nötig
+        if (evt.oldIndex === orte.length - 1 || evt.newIndex === orte.length - 1) {
+            aktualisiereStoppListe(); // Reset Sortierung
+            return;
+        }
 
-            const ort = orte.splice(altIndex, 1)[0];
-            orte.splice(neuIndex, 0, ort);
+        const ort = orte.splice(evt.oldIndex, 1)[0];
+        orte.splice(evt.newIndex, 0, ort);
+        const punkt = punkte.splice(evt.oldIndex, 1)[0];
+        punkte.splice(evt.newIndex, 0, punkt);
 
-            const punkt = punkte.splice(altIndex, 1)[0];
-            punkte.splice(neuIndex, 0, punkt);
-
-            markerListe.forEach(m => karte.removeLayer(m));
-            Object.values(markerMap).forEach(m => karte.removeLayer(m));
-            markerListe = [];
-            Object.keys(markerMap).forEach(k => delete markerMap[k]);
-
-            punkte.forEach((latlng, i) => {
-                const ort = orte[i];
-                let marker;
-
-                if (i === orte.length - 1) {
-                    marker = L.marker(latlng, {
-                        icon: L.icon({
-                            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                            iconSize: [30, 30],
-                            iconAnchor: [15, 30],
-                            popupAnchor: [0, -30]
-                        })
-                    }).addTo(karte).bindPopup(ort + " (Ziel)");
-                } else {
-                    marker = L.marker(latlng).addTo(karte).bindPopup(ort);
-                }
-
-                markerListe.push(marker);
-                markerMap[ort] = marker;
-            });
-
-
-            zeichneRoute();
+            ladeUndZeigeRoute();
             
         }
     });
 }
 
 async function addOrtAufKarte(ortName) {
-    if (orte.includes(ortName)) return; 
-    orte.push(ortName);
+  if (orte.includes(ortName)) return;
+      
+      const zielIndex = orte.indexOf(zielort);
+      const einfügeIndex = zielIndex !== -1 ? zielIndex : orte.length;
 
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ortName)}`);
-    const daten = await res.json();
-    if (daten.length > 0) {
-        const lat = parseFloat(daten[0].lat);
-        const lon = parseFloat(daten[0].lon);
+      orte.splice(einfügeIndex, 0, ortName);
 
-        punkte.push([lat, lon]);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(ortName)}`);
+      const daten = await res.json();
+      if (daten.length > 0) {
+          const lat = parseFloat(daten[0].lat);
+          const lon = parseFloat(daten[0].lon);
 
-        const marker = L.marker([lat, lon]).addTo(karte).bindPopup(ortName);
-        markerListe.push(marker);
-        markerMap[ortName] = marker;
+          punkte.splice(einfügeIndex, 0, [lat, lon]);
 
-        zeichneRoute();
-        aktualisiereStoppListe();
-        speichereStoppreihenfolge();
-        zeigeStoppInfos(ortName, lat, lon);
-    } else {
-        zeigeToastError("Ort nicht gefunden: " + ortName);
+          const marker = L.marker([lat, lon]).addTo(karte).bindPopup(ortName);
+          markerListe.splice(einfügeIndex, 0, marker);
+          markerMap[ortName] = marker;
+
+          zeichneRoute();
+          aktualisiereStoppListe();
+          speichereStoppreihenfolge();
+          zeigeStoppInfos(ortName, lat, lon);
+      } else {
+          zeigeToastError("Ort nicht gefunden: " + ortName);
+      }
+  }
+function removeMarkerFromMap(stoppId) {
+    if (markerMap[stoppId]) {
+        map.removeLayer(markerMap[stoppId]);
+        delete markerMap[stoppId];
     }
 }
-document.querySelector('.stopp-eingabe button').addEventListener('click', (e) => {
-    e.preventDefault();
-    const val = document.getElementById('stopp').value.trim();
-    if (val) {
-        addOrtAufKarte(val);
-        document.getElementById('stopp').value = '';
-    }
-});
-document.getElementById('stopp').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+document.addEventListener('DOMContentLoaded', () => {
+    ladeUndZeigeRoute();
+    initStopps("DE");
+
+    document.querySelector('.stopp-eingabe button')?.addEventListener('click', (e) => {
         e.preventDefault();
-        const val = e.target.value.trim();
+        const val = document.getElementById('stopp').value.trim();
         if (val) {
             addOrtAufKarte(val);
-            e.target.value = '';
+            document.getElementById('stopp').value = '';
         }
-    }
+    });
+
+    document.getElementById('stopp')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim();
+            if (val) {
+                addOrtAufKarte(val);
+                e.target.value = '';
+            }
+        }
+    });
 });
 function entferneStopp(name) {
+    console.log("Entferne Stopp:", name);
+    console.log("markerMap keys:", Object.keys(markerMap));
+    const marker = markerMap[name];
+    console.log("Gefundener Marker:", marker);
+
+    if (name === zielort) {
+        zeigeToastError("Der Zielort kann nicht entfernt werden.");
+        return;
+    }
+
     const index = orte.indexOf(name);
+    console.log("Index in orte:", index);
     if (index !== -1) {
         orte.splice(index, 1);
         punkte.splice(index, 1);
 
-        const marker = markerMap[name];
         if (marker) {
             karte.removeLayer(marker);
             delete markerMap[name];
+        } else {
+            console.warn("Marker nicht gefunden für:", name);
+        }
+
+        const markerIndex = markerListe.indexOf(marker);
+        if (markerIndex !== -1) {
+            markerListe.splice(markerIndex, 1);
         }
 
         aktualisiereStoppListe();
 
-        zeichneRoute();
+        if (window.routePolyline) {
+            karte.removeLayer(window.routePolyline);
+            window.routePolyline = null;
+        }
+        ladeUndZeigeRoute();
 
-    const infoDiv = document.getElementById("stopp-info");
-    const aktuellerTitel = infoDiv.querySelector("h3");
-    if (aktuellerTitel && aktuellerTitel.textContent === name) {
-    infoDiv.innerHTML = "<em>Informationen zu ausgewähltem Stopp werden hier angezeigt.</em>";
-}
-
+        const infoDiv = document.getElementById("stopp-info");
+        const aktuellerTitel = infoDiv.querySelector("h3");
+        if (aktuellerTitel && aktuellerTitel.textContent === name) {
+            infoDiv.innerHTML = "<em>Informationen zu ausgewähltem Stopp werden hier angezeigt.</em>";
+        }
+    } else {
+        console.warn("Stopp nicht in orte gefunden:", name);
     }
 }
 
@@ -452,7 +486,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initStopps(zielland) {
     const input = document.getElementById('stopp');
     const list = document.getElementById('autocomplete-list');
-    const tagContainer = document.getElementById('stopp-tags');
     const hiddenField = document.getElementById('stopp-hidden');
     const stopps = [];
 
@@ -469,7 +502,6 @@ function initStopps(zielland) {
     if (stopps.some(s => s.toLowerCase() === normalized)) return;
 
     stopps.push(name);
-    updateTagUI();
     input.value = '';
     list.style.display = 'none';
     hiddenField.value = stopps.join(',');
@@ -479,32 +511,15 @@ function initStopps(zielland) {
     }
 
 
-    function removeStopp(name) {
-        const index = stopps.findIndex(s => s === name);
-        if (index !== -1) {
-            stopps.splice(index, 1);
-            hiddenField.value = stopps.join(',');
-        }
+function removeStopp(name) {
+    const index = stopps.findIndex(s => s === name);
+    if (index !== -1) {
+        stopps.splice(index, 1);
+        hiddenField.value = stopps.join(',');
+
+        entferneStopp(name);
     }
-
-    function updateTagUI() {
-        tagContainer.innerHTML = '';
-        stopps.forEach(name => {
-            const tag = document.createElement('div');
-            tag.textContent = name;
-            tag.className = 'tag';
-            tag.style.cssText = 'display:inline-block;margin:5px;padding:5px 10px;background:#ccc;border-radius:15px';
-
-            const remove = document.createElement('button');
-            remove.textContent = '✖';
-            remove.style.cssText = 'margin-left:8px;background:none;border:none;cursor:pointer';
-            remove.addEventListener('click', () => removeStopp(name));
-
-            tag.appendChild(remove);
-            tagContainer.appendChild(tag);
-        });
-    }
-
+}
     input.addEventListener('input', async () => {
         const query = input.value.trim();
         if (query.length < 2 || !zielland) {
@@ -552,12 +567,20 @@ function initStopps(zielland) {
         }
     });
 
-    document.querySelector('form').addEventListener('submit', (e) => {
-        const val = input.value.trim();
-        if (val && !stopps.some(s => s.toLowerCase() === val.toLowerCase())) {
-            addStopp(val);
-        }
-    });
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (val && !stopps.some(s => s.toLowerCase() === val.toLowerCase())) {
+                addStopp(val);
+            }
+        });
+    } else {
+        console.warn('Kein <form>-Element gefunden.');
+    }
+});
 }
 
 function zeigeToast(message, dauer = 3000) {
