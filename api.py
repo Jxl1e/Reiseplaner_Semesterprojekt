@@ -4,7 +4,9 @@ import requests
 import os
 from app import reisen
 
+gapi_key = os.getenv("GOOGLE_API_KEY")
 api_key = os.getenv("API_KEY")
+sapi_key = os.getenv("API_SECRET")
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -12,7 +14,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 def google_places():
     query = request.args.get('query')
     url = 'https://maps.googleapis.com/maps/api/place/textsearch/json'
-    params = {'query': query, 'key': GOOGLE_API_KEY}
+    params = {'query': query, 'key': gapi_key}
     r = requests.get(url, params=params)
     
     return jsonify(r.json())
@@ -24,7 +26,7 @@ def place_photo():
     r = requests.get("https://maps.googleapis.com/maps/api/place/photo", params={
         "photo_reference": ref,
         "maxwidth": 400,
-        'key': GOOGLE_API_KEY
+        'key': gapi_key
     }, allow_redirects=False)
     return redirect(r.headers["Location"])
 
@@ -111,8 +113,8 @@ def hole_token():
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     data = {
         "grant_type": "client_credentials",
-        "client_id": API_KEY,
-        "client_secret": API_SECRET
+        "client_id": api_key,
+        "client_secret": sapi_key
     }
     res = requests.post(url, headers=headers, data=data)
     res.raise_for_status()
