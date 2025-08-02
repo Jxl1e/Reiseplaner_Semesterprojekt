@@ -3,11 +3,9 @@ from flask_bcrypt import Bcrypt
 from flask_login import LoginManager
 from pymongo import MongoClient
 from flask_assets import Environment
+from dotenv import load_dotenv
 
-API_KEY = "Gsbuy4IeGweWPquMj4z8i8sISSjGli2z"
-API_SECRET = "75Ocnq4Z3Fn7ExTc"
-GOOGLE_API_KEY = "AIzaSyClEWrPjwpVkTYTXU2yhI2AN7QJ1LYGzHM"
-
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "geheimes_token"

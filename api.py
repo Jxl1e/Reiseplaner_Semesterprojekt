@@ -2,7 +2,9 @@ from flask import Blueprint, request, jsonify, redirect
 from bson.objectid import ObjectId
 import requests
 import os
-from app import reisen, API_KEY, API_SECRET, GOOGLE_API_KEY
+from app import reisen
+
+api_key = os.getenv("API_KEY")
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 

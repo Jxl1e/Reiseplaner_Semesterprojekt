@@ -337,7 +337,7 @@ def anzeigen_staedtetrip(reise_id):
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
         flash("Reise nicht gefunden", "error")
-        return redirect(url_for('reisen.dahboard'))
+        return redirect(url_for('reisen.dashboard'))
     
     sehenswuerdigkeiten = reise.get("sehenswuerdigkeiten")
     if not isinstance(sehenswuerdigkeiten, list):
@@ -363,7 +363,7 @@ def anzeigen_badeurlaub(reise_id):
     reise = reisen.find_one({"_id": oid, "user_id": current_user.id})
     if not reise:
         flash("Reise nicht gefunden", "error")
-        return redirect(url_for('reisen.dahboard'))
+        return redirect(url_for('reisen.dashboard'))
     
     return render_template("anzeigen_badeurlaub.html", reise=reise, reise_id=oid)
 
